@@ -55,6 +55,12 @@ modules:
       title: Arm's Length
       resource: admin
       render: native
+      resolver:
+        function: resolver
+    - key: arms-length-get-started
+      title: Arm's Length
+      resource: admin
+      render: native
       useAsGetStarted: true
       resolver:
         function: resolver

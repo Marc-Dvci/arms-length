@@ -14,7 +14,8 @@
     "demo": "tsx cli/demo.ts",
     "typecheck": "tsc --noEmit",
     "lint": "forge lint",
-    "manifest": "node scripts/validate-manifests.cjs"
+    "manifest": "node scripts/validate-manifests.cjs",
+    "release-gate": "tsx scripts/release-gate.ts"
   },
   "devDependencies": {
     "@forge/manifest": "^13.8.0",

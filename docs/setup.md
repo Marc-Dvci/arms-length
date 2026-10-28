@@ -24,8 +24,9 @@ Confluence is optional. Without it, everything works except **Publish workpaper*
 
 ## 2. Load the demo bank
 
-**Apps > Manage your apps > Arm's Length** (or **Apps > Arm's Length** on the Get started page), tab
-**Get started**: choose a project and click **Load demo bank**. It creates 35 work items labelled
+**Settings (gear) > Marketplace apps**, then **Arm's Length** under **Apps** in the left navigation (also
+reachable from **Open the settings** on the empty population page). Tab **Get started**: choose a project and
+click **Load demo bank**. It creates 35 work items labelled
 `arms-length-demo`, stores their synthetic change chains, and sends their pull requests and deployments to
 Jira's development panel. **Remove demo data** deletes the chains and the development data; the work items stay.
 
@@ -44,9 +45,21 @@ Tab **Identities**. Jira app accounts count as agents by default. Register:
 
 ## 5. Gate the release transition in Jira
 
-In a company-managed project: **Project settings > Workflows**, edit the workflow, select the transition into
-your release status (for example "Ready for release"), add the validator **Independent approval (Arm's Length)**,
-and publish. The transition then succeeds only for work items whose verdict is PASS.
+For a new company-managed project, one command creates the statuses Backlog, In Progress, In Review,
+Ready for release and Done, a workflow whose transition into **Ready for release** runs the validator, and a
+workflow scheme, then assigns the scheme to the project:
+
+```
+JIRA_SITE=<site>.atlassian.net JIRA_EMAIL=<email> JIRA_API_TOKEN=<token> npm run release-gate -- PAY
+```
+
+Run it before loading the demo bank, while the project has no work items. For an existing project:
+**Project settings > Workflows**, edit the workflow, select the transition into your release status, add the
+validator **Independent approval (Arm's Length)**, and publish.
+
+The transition then succeeds only for work items whose verdict is PASS. A refused transition shows the reason,
+for example "Arm's Length FAIL: payments-core#482 needs an approval from someone other than Léa Martin
+(requested the change and directed Coding agent).
 
 ## 6. Pair Bitbucket
 

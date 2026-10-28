@@ -1,6 +1,6 @@
 # Arm's Length: independent approval for agent-written code
 
-![tests](https://img.shields.io/badge/tests-117%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+![tests](https://img.shields.io/badge/tests-120%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
@@ -28,13 +28,15 @@ I test change-management controls in IT audits at a bank's technology practice.
 
 The judge path needs one Jira site and no Bitbucket account.
 
-1. Install the app with the installation link, then open **Apps > Arm's Length** (the app's settings page).
+1. Install the app with the installation link. Open **Apps > Change independence test** and click
+   **Open the settings** (or **Settings > Marketplace apps > Arm's Length**).
 2. Pick a project and click **Load demo bank**. It creates 35 work items with one quarter of synthetic change
    chains: seven people, three coding agents, pull requests and production deployments.
-3. Open **Apps > Change independence test** and choose the demo quarter. Six FAIL rows and one CANNOT DETERMINE
-   appear among 34 production deployments.
-4. Open the work item named "[PAY-482]". Its only approval comes from Léa Martin, who requested the change and
-   assigned it to the Coding agent. The panel shows FAIL and names who cannot approve.
+3. Back on **Apps > Change independence test**, the demo quarter shows six FAIL rows and one CANNOT DETERMINE
+   among 34 production deployments.
+4. Open the scene the settings page links to, "Check the IBAN country code against the beneficiary bank", and
+   open **Arm's Length** from the work item's apps button. Its only approval comes from Léa Martin, who
+   requested the change and assigned it to the Coding agent. The panel shows FAIL and names who cannot approve.
 5. Click **Merge and deploy**: the release pipeline check stops it. Click **Ask Rovo who should approve**: the
    agent names Tom Becker, who reviewed 5 pull requests in `payments-core` in 90 days and is outside the chain.
 6. Click **Approve as me**. You are outside the chain, so the verdict turns PASS. **Merge and deploy** now ships it.
@@ -175,6 +177,23 @@ places that work on every plan: the Jira validator and the Pipelines step.
 
 The confusion matrices are in [`eval/reports/confusion.md`](eval/reports/confusion.md).
 
+### Run live
+
+On a Jira and Confluence Standard developer site, 28 October 2026, app deployed to the development environment,
+signed in as a site admin outside the demo chains. Times are wall-clock in the browser.
+
+| Step | Result |
+|---|---|
+| Load demo bank | 35 work items created, change chains stored, pull requests and deployments in Jira's development panel, 19.8 s |
+| Population test, demo quarter | 34 production deployments: 27 PASS, 6 FAIL, 1 CANNOT DETERMINE, 3 to 8 s |
+| JQL `armsLengthVerdict = FAIL` | 7 work items: the 6 failures of the quarter and the open scene |
+| **Merge and deploy** on the scene | Stopped in 2.9 s: "needs an approval from someone other than Léa Martin" |
+| Transition to Ready for release (validator) | Refused in 2.0 s with the same reason; a PASS work item went through |
+| **Approve as me**, then **Merge and deploy** | Verdict PASS, pull request merged, `prod-482` deployed, 1.3 s |
+| Raise exceptions as work items | 7 work items, 3.9 s |
+| Publish workpaper | Confluence page in the signed-in user's name, full width, 2.4 s |
+| `rovo:mcp` | Tools exposed to MCP clients from Atlassian Administration > Connected apps |
+
 **Real and synthetic.** The case sets and the demo bank are synthetic. The engine, the adapters and the Forge
 modules are the code that runs on a Jira site.
 
@@ -197,10 +216,16 @@ No credentials:
 
 ```
 npm ci
-npm test          # 117 tests
+npm test          # 120 tests
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline
+```
+
+Gate a new project's release transition (company-managed, no work items yet):
+
+```
+JIRA_SITE=<site>.atlassian.net JIRA_EMAIL=<email> JIRA_API_TOKEN=<token> npm run release-gate -- PAY
 ```
 
 Or `docker build -t arms-length . && docker run --rm arms-length`.

@@ -6,6 +6,7 @@ import ForgeReconciler, {
   DynamicTable,
   Heading,
   Inline,
+  Link,
   Lozenge,
   SectionMessage,
   Select,
@@ -139,7 +140,9 @@ function App() {
               {data.demo ? (
                 <Stack space="space.100">
                   <Text>{`Loaded into ${data.demo.projectKey} on ${data.demo.loadedAt.slice(0, 16).replace('T', ' ')} UTC: ${Object.keys(data.demo.keys).length} work items.`}</Text>
-                  <Text>{`The scene: open ${data.demo.keys['PAY-482']} (demo PAY-482). Its only approval comes from the person who requested the change and directed the coding agent.`}</Text>
+                  <Text>
+                    The scene: <Link href={`/browse/${data.demo.keys['PAY-482']}`}>{data.demo.keys['PAY-482']}</Link>, an open pull request whose only approval comes from the person who requested the change and directed the coding agent.
+                  </Text>
                   {data.demo.devInfo && data.demo.devInfo !== 'sent' ? <Text color="color.text.subtle">{`Development panel: ${data.demo.devInfo}. Verdicts do not depend on it.`}</Text> : null}
                   <Inline space="space.100">
                     {data.demo.devInfo && data.demo.devInfo !== 'sent' ? (
@@ -208,6 +211,8 @@ function App() {
             <Stack space="space.100">
               <Heading size="medium">Gate the release transition</Heading>
               <Text>In the workflow of a company-managed project, add the validator "Independent approval (Arm's Length)" to the transition into your release status. It lets a work item through only when its verdict is PASS.</Text>
+              <Text>For a new project, one command creates the workflow with the validator and assigns it:</Text>
+              <CodeBlock language="shell" text={`JIRA_SITE=<site>.atlassian.net JIRA_EMAIL=<email> JIRA_API_TOKEN=<token> npm run release-gate -- <PROJECT_KEY>`} />
             </Stack>
           </Stack>
         </TabPanel>

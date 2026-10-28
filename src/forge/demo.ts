@@ -98,7 +98,7 @@ export async function loadDemoBank(projectKey: string, caller: Ref): Promise<Dem
     bank.map((c) => ({
       project: { key: project.key },
       issuetype: type ? { id: type.id } : { name: 'Task' },
-      summary: `${c.workItem.summary} [${c.workItem.key}]`,
+      summary: c.workItem.summary,
       labels: ['arms-length-demo', ...(c.emergency ? ['emergency-change'] : [])],
       description: {
         type: 'doc',

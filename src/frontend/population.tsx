@@ -17,6 +17,7 @@ import ForgeReconciler, {
   xcss,
 } from '@forge/react';
 import type { PopulationResult, PopulationRow } from '../core/population';
+import { router } from '@forge/bridge';
 import { Field } from './field';
 import { call, recentQuarters, verdictAppearance } from './shared';
 
@@ -147,6 +148,13 @@ function App() {
         <EmptyState
           header="No production deployments in this period"
           description={data.demo ? 'Choose the demo quarter to see the demo bank.' : "Load the demo bank from the app's settings page, or pair Bitbucket to record real releases."}
+          primaryAction={
+            data.demo ? undefined : (
+              <Button appearance="primary" onClick={() => router.navigate({ target: 'module', moduleKey: 'arms-length-admin' })}>
+                Open the settings
+              </Button>
+            )
+          }
         />
       )}
 
