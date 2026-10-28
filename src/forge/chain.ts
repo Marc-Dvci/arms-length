@@ -45,7 +45,7 @@ export async function liveChain(key: string, config: AppConfig): Promise<ChangeC
   for (const a of assignments) [a.by, a.to].forEach((r) => refs.add(r));
   for (const d of declarations) refs.add(d.principal);
   for (const pr of prs) {
-    Object.assign(hints, (pr as { people?: Record<Ref, { name: string; type?: string }> }).people ?? {});
+    Object.assign(hints, pr.people ?? {});
     [pr.author, ...pr.commits.map((c) => c.author), ...pr.reviews.map((r) => r.by)].forEach((r) => refs.add(r));
   }
   for (const [ref, o] of Object.entries(config.identities)) {
