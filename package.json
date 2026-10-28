@@ -1,0 +1,25 @@
+{
+  "name": "arms-length",
+  "version": "1.0.0",
+  "description": "Independent approval for agent-written code: a Forge app for Jira, Bitbucket, Confluence and Rovo.",
+  "license": "MIT",
+  "private": true,
+  "author": "Marc Donovici",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "eval": "tsx eval/run.ts",
+    "demo": "tsx cli/demo.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "forge lint"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
