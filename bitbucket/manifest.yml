@@ -1,5 +1,5 @@
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/f2138610-f8a9-458f-88b4-58280b370dc8
   runtime:
     name: nodejs24.x
     memoryMB: 256
@@ -24,7 +24,8 @@ modules:
   bitbucket:mergeCheck:
     - key: arms-length-merge-check
       name: Independent approval (Arm's Length)
-      description: Passes when an approval comes from someone outside the change chain, including whoever directed the coding agent.
+      description: Passes when an approval comes from someone outside the change
+        chain, including whoever directed the coding agent.
       function: check
       triggers:
         - on-code-pushed
