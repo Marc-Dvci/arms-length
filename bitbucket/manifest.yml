@@ -1,0 +1,63 @@
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  storage:
+    classifications:
+      - pii
+      - other
+
+permissions:
+  scopes:
+    - read:pullrequest:bitbucket
+    - read:repository:bitbucket
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - address: '*.atlassian-dev.net'
+        - address: '*.atlassian.net'
+
+modules:
+  bitbucket:mergeCheck:
+    - key: arms-length-merge-check
+      name: Independent approval (Arm's Length)
+      description: Passes when an approval comes from someone outside the change chain, including whoever directed the coding agent.
+      function: check
+      triggers:
+        - on-code-pushed
+        - on-reviewer-status-changed
+        - on-merge
+
+  bitbucket:workspaceSettingsMenuPage:
+    - key: arms-length-settings
+      title: Arm's Length
+      resource: settings
+      render: native
+      resolver:
+        function: resolver
+
+  bitbucket:repoPullRequestCard:
+    - key: arms-length-card
+      title: Arm's Length
+      icon: resource:assets;icon.svg
+      resource: card
+      render: native
+      resolver:
+        function: resolver
+
+  function:
+    - key: check
+      handler: index.check
+    - key: resolver
+      handler: index.resolver
+
+resources:
+  - key: settings
+    path: src/frontend/settings.tsx
+  - key: card
+    path: src/frontend/card.tsx
+  - key: assets
+    path: static/assets

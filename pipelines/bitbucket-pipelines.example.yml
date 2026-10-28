@@ -1,0 +1,18 @@
+# Example: the release step runs the Arm's Length gate before it deploys.
+# Copy pipelines/arms-length-gate.sh into your repository and set the two repository variables.
+image: atlassian/default-image:4
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Build and test
+          script:
+            - npm ci
+            - npm test
+      - step:
+          name: Deploy to production
+          deployment: production
+          script:
+            - sh pipelines/arms-length-gate.sh production
+            - ./scripts/deploy.sh

@@ -1,0 +1,16 @@
+{
+  "name": "arms-length-bitbucket",
+  "version": "1.0.0",
+  "description": "Arm's Length merge check and pull request card for Bitbucket Cloud.",
+  "license": "MIT",
+  "private": true,
+  "author": "Marc Donovici",
+  "dependencies": {
+    "@forge/api": "^8.4.0",
+    "@forge/bridge": "^7.2.1",
+    "@forge/kvs": "^2.1.1",
+    "@forge/react": "^12.4.0",
+    "@forge/resolver": "^2.0.2",
+    "react": "^18.3.1"
+  }
+}

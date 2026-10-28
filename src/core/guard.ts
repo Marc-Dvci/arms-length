@@ -37,8 +37,12 @@ const isoDay = (iso: string) => iso.slice(0, 10);
 const hhmm = (iso: string) => iso.slice(11, 16);
 
 /** Everything a draft about this verdict may mention. */
-export function allowedFromEvidence(chain: ChangeChain, verdict: Verdict, extra: { numbers?: (string | number)[]; dates?: string[] } = {}): Allowed {
-  const names = Object.values(chain.people).map((p) => p.name);
+export function allowedFromEvidence(
+  chain: ChangeChain,
+  verdict: Verdict,
+  extra: { names?: string[]; numbers?: (string | number)[]; dates?: string[] } = {},
+): Allowed {
+  const names = [...Object.values(chain.people).map((p) => p.name), ...(extra.names ?? [])];
   const stamps = [
     ...chain.assignments.map((a) => a.at),
     ...chain.declarations.map((d) => d.at),

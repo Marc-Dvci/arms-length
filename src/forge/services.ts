@@ -176,7 +176,12 @@ export async function declareAgentWork(caller: Ref, key: string, branch?: string
 /** Posts a drafted management response, only when every fact in it is in the evidence. */
 export async function postManagementResponse(key: string, text: string): Promise<{ posted: boolean; guard: GuardResult; commentId?: string }> {
   const a = await assessIssue(key, { writeProperty: false });
-  const guard = checkDraft(text, allowedFromEvidence(a.chain, a.verdict));
+  // The reviewers the app itself proposes may be named too, with their review counts.
+  const who = await whoMustApprove(key);
+  const guard = checkDraft(
+    text,
+    allowedFromEvidence(a.chain, a.verdict, { names: who.suggestions.map((s) => s.name), numbers: who.suggestions.map((s) => s.reviews) }),
+  );
   if (!guard.ok) return { posted: false, guard };
   const comment = await addComment(key, ["Management response (checked by Arm's Length against the change evidence):", ...text.split(/\n{2,}/)]);
   return { posted: true, guard, commentId: comment.id };
