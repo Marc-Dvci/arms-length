@@ -93,14 +93,16 @@ interface Spec {
   prodCommit?: 'merge' | 'hotfix';
   state?: 'MERGED' | 'OPEN';
   staging?: boolean;
+  /** Clock of the scene: assignment time, then minutes to the first commit and to the pull request. */
+  clock?: { assigned: [number, number]; commitAfterMin: number; prAfterMin: number };
 }
 
 function chainFrom(spec: Spec): ChangeChain {
   const isAgent = spec.assignee.startsWith('a:');
   const author = isAgent ? BOT[spec.assignee] : spec.assignee;
-  const assignedAt = at(spec.day, 8, 40);
-  const firstCommit = hoursAfter(assignedAt, 1);
-  const prStart = hoursAfter(firstCommit, 0.25);
+  const assignedAt = spec.clock ? at(spec.day, ...spec.clock.assigned) : at(spec.day, 8, 40);
+  const firstCommit = hoursAfter(assignedAt, spec.clock ? spec.clock.commitAfterMin / 60 : 1);
+  const prStart = hoursAfter(firstCommit, spec.clock ? spec.clock.prAfterMin / 60 : 0.25);
   const merged = hoursAfter(prStart, 5);
   const num = spec.key.split('-')[1];
   const commits: Commit[] = [{ hash: `${num}a1c0`, author, at: firstCommit }];
@@ -167,7 +169,9 @@ function healthy(i: number): Spec {
   const assigner = agent ? (i % 2 ? 'u:lea' : 'u:tom') : 'u:sam';
   const requester = i % 4 === 0 ? 'u:lea' : 'u:sam';
   const blocked = new Set([assigner, requester, assignee]);
-  const reviewer = REVIEWERS.filter((r) => !blocked.has(r))[i % 2] ?? 'u:aicha';
+  const pool = REVIEWERS.filter((r) => !blocked.has(r));
+  // Tom is the payments-core regular, so he is the reviewer the agent proposes in the scene.
+  const reviewer = REPOS[i % 3] === 'payments-core' && pool.includes('u:tom') ? 'u:tom' : (pool[i % 2] ?? 'u:aicha');
   return {
     key: `PAY-${HEALTHY_NUMBERS[i]}`,
     summary: SUMMARIES[i % SUMMARIES.length],
@@ -227,7 +231,8 @@ export function buildDemoBank(): ChangeChain[] {
     {
       key: DEMO_OPEN_ITEM, summary: 'Check the IBAN country code against the beneficiary bank', day: '2026-10-27', repo: 'payments-core',
       requester: 'u:lea', assignee: 'a:coder', assigner: 'u:lea', state: 'OPEN',
-      reviewers: (s, head) => [approve('u:lea', hoursAfter(s, 0.12), head)],
+      clock: { assigned: [17, 40], commitAfterMin: 24, prAfterMin: 1 },
+      reviewers: (s, head) => [approve('u:lea', hoursAfter(s, 7 / 60), head)],
     },
   );
   return specs.map(chainFrom).sort((a, b) => (a.workItem.key < b.workItem.key ? -1 : 1));

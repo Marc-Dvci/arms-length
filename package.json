@@ -13,9 +13,11 @@
     "eval": "tsx eval/run.ts",
     "demo": "tsx cli/demo.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "forge lint"
+    "lint": "forge lint",
+    "manifest": "node scripts/validate-manifests.cjs"
   },
   "devDependencies": {
+    "@forge/manifest": "^13.8.0",
     "@types/node": "^24.19.2",
     "@types/react": "^18.3.31",
     "tsx": "^4.23.15",
