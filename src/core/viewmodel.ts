@@ -63,7 +63,10 @@ export function panelView(chain: ChangeChain, v: Verdict, source: 'demo' | 'live
     chainSteps.push({
       step: 'Directed the agent',
       people: [...byPerson.keys()].map(person),
-      note: [...byPerson.entries()].map(([r, agents]) => `${nameOf(chain, r)} directed ${listNames([...agents].map((a) => nameOf(chain, a)))}`).join('; '),
+      note:
+        byPerson.size === 1
+          ? `→ ${listNames([...[...byPerson.values()][0]].map((a) => nameOf(chain, a)))}`
+          : [...byPerson.entries()].map(([r, agents]) => `${nameOf(chain, r)} → ${listNames([...agents].map((a) => nameOf(chain, a)))}`).join('; '),
     });
   }
   const writers = active.flatMap((p) => [p.author, ...p.commits.map((c) => c.author)]);

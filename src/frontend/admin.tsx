@@ -112,10 +112,7 @@ function App() {
 
   return (
     <Stack space="space.300">
-      <Stack space="space.100">
-        <Heading size="large">Arm's Length settings</Heading>
-        <Text>Independent approval for agent-written code: who may approve, what gates the release, and the demo bank.</Text>
-      </Stack>
+      <Text>Independent approval for agent-written code: who may approve, what gates the release, and the demo bank.</Text>
       {notice ? (
         <SectionMessage appearance="success">
           <Text>{notice}</Text>
@@ -145,6 +142,11 @@ function App() {
                   <Text>{`The scene: open ${data.demo.keys['PAY-482']} (demo PAY-482). Its only approval comes from the person who requested the change and directed the coding agent.`}</Text>
                   {data.demo.devInfo && data.demo.devInfo !== 'sent' ? <Text color="color.text.subtle">{`Development panel: ${data.demo.devInfo}. Verdicts do not depend on it.`}</Text> : null}
                   <Inline space="space.100">
+                    {data.demo.devInfo && data.demo.devInfo !== 'sent' ? (
+                      <Button isDisabled={!!busy} onClick={() => act('resend', () => call('resendDevInfo'), 'Development data sent.')}>
+                        Send development data again
+                      </Button>
+                    ) : null}
                     <Button appearance="warning" isDisabled={!!busy} onClick={() => act('remove', () => call('removeDemo'), 'Demo bank removed. The work items stay in the project.')}>
                       Remove demo data
                     </Button>

@@ -141,10 +141,15 @@ export async function raiseExceptions(result: PopulationResult, projectKey: stri
   return links;
 }
 
-export async function listSpaces(): Promise<{ id: string; key: string; name: string }[]> {
-  const res = await api.asUser().requestConfluence(route`/wiki/api/v2/spaces?limit=50&type=global`);
+/** Spaces the current user can see, team spaces first and personal spaces last. */
+export async function listSpaces(): Promise<{ id: string; key: string; name: string; personal: boolean }[]> {
+  const res = await api.asUser().requestConfluence(route`/wiki/api/v2/spaces?limit=100&status=current`);
   if (!res.ok) throw new Error(`Confluence spaces could not be listed (${res.status}). Is Confluence on this site?`);
-  return ((await res.json()) as { results: { id: string; key: string; name: string }[] }).results;
+  const spaces = ((await res.json()) as { results: { id: string; key: string; name: string; type?: string }[] }).results;
+  const rank = (type?: string) => (type === 'personal' ? 1 : 0);
+  return spaces
+    .sort((a, b) => rank(a.type) - rank(b.type) || a.name.localeCompare(b.name))
+    .map(({ id, key, name, type }) => ({ id, key, name, personal: type === 'personal' }));
 }
 
 /** Publishes the workpaper as a Confluence page created by the person running the test. */

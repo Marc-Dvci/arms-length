@@ -99,6 +99,10 @@ export async function fakeRequestJira(path: string, init?: RequestInit): Promise
   if (p === '/rest/api/3/serverInfo') return ok({ baseUrl: 'https://site.atlassian.net' });
   if ((m = p.match(/^\/rest\/api\/3\/project\/([^/]+)$/))) return ok({ id: '1', key: m[1], name: m[1], issueTypes: [{ id: '10001', name: 'Task' }] });
   if (p.startsWith('/rest/devinfo') || p.startsWith('/rest/deployments')) {
+    // Jira rejects the whole request when a timestamp lacks seconds (2026-07-02T09:55Z).
+    const stamps = [...String(init?.body ?? '').matchAll(/"lastUpdated?":"([^"]+)"/g)].map((x) => x[1]);
+    const bad = stamps.find((t) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(t));
+    if (bad) return ok({ errorMessages: [`'lastUpdate' is not a valid timestamp. Must be an ISO8601 / RFC3339 form: ${bad}`] }, 400);
     site.devops.push({ p, body: init?.body });
     return ok({ acceptedRepositories: [] }, 202);
   }

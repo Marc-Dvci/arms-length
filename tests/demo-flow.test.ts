@@ -9,7 +9,7 @@ vi.mock('@forge/api', () => {
 });
 
 import { assessIssue } from '../src/forge/chain';
-import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank } from '../src/forge/demo';
+import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank, resendDevInfo } from '../src/forge/demo';
 import { populationTest, whoMustApprove } from '../src/forge/services';
 import { getDemoIndex } from '../src/forge/store';
 
@@ -21,6 +21,16 @@ beforeEach(() => {
 });
 
 describe('demo bank on a site', () => {
+  it('resends the development data when the first send failed', async () => {
+    const index = await loadDemoBank('PAY', JUDGE);
+    expect(index.devInfo).toBe('sent');
+    const sent = site.devops.length;
+    expect(sent).toBeGreaterThan(1);
+    expect((await resendDevInfo())?.devInfo).toBe('sent');
+    expect(site.devops.length).toBe(sent * 2);
+    expect((await getDemoIndex())?.devInfo).toBe('sent');
+  });
+
   it('loads 35 work items, then the judge approves and ships the scene', async () => {
     const index = await loadDemoBank('PAY', JUDGE);
     expect(Object.keys(index.keys)).toHaveLength(35);

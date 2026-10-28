@@ -19,6 +19,9 @@ function rekey(chain: ChangeChain, keys: Record<string, string>): ChangeChain {
   return c;
 }
 
+/** Jira's development and deployment APIs want full ISO 8601 timestamps, with seconds. */
+const isoFull = (stamp: string) => new Date(stamp).toISOString();
+
 const docUrl = (anchor: string) => `${REPO_URL}/blob/main/docs/demo-bank.md#${anchor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 async function pushDevInfo(chains: ChangeChain[], demoKeys: Record<string, string>) {
@@ -45,7 +48,7 @@ async function pushDevInfo(chains: ChangeChain[], demoKeys: Record<string, strin
             commentCount: 0,
             sourceBranch: pr.sourceBranch,
             destinationBranch: 'main',
-            lastUpdate: pr.mergedAt ?? pr.reviews.at(-1)?.at ?? pr.createdAt,
+            lastUpdate: isoFull(pr.mergedAt ?? pr.reviews.at(-1)?.at ?? pr.createdAt),
             reviewers: [...current.entries()]
               .filter(([by]) => c.people[by])
               .map(([by, action]) => ({ name: c.people[by].name, approvalStatus: action === 'approved' ? 'APPROVED' : 'UNAPPROVED', ...(by.startsWith('u:') || by.startsWith('a:') || by.startsWith('b:') || by.startsWith('s:') ? {} : { accountId: by }) })),
@@ -65,7 +68,7 @@ async function pushDevInfo(chains: ChangeChain[], demoKeys: Record<string, strin
       displayName: `${d.pipeline ?? 'release'} ${d.id}`,
       url: docUrl(d.id),
       description: `Deployed ${d.commit}`,
-      lastUpdated: d.at,
+      lastUpdated: isoFull(d.at),
       label: d.commit,
       state: 'successful',
       pipeline: { id: d.pipeline ?? 'payments-release', displayName: d.pipeline ?? 'payments-release', url: docUrl('pipelines') },
@@ -119,6 +122,20 @@ export async function loadDemoBank(projectKey: string, caller: Ref): Promise<Dem
   await kvs.set(K.demoIndex, index);
   await inBatches(chains, 10, (c) => assessIssue(c.workItem.key).catch(() => undefined));
   return index;
+}
+
+/** Sends the stored demo chains to Jira's development panel again, after a failed first send. */
+export async function resendDevInfo(): Promise<DemoIndex | null> {
+  const index = await getDemoIndex();
+  if (!index) return null;
+  const chains = (await Promise.all(Object.values(index.keys).map((key) => getDemoChain(key)))).filter((c): c is ChangeChain => !!c);
+  const devInfo = await pushDevInfo(chains, index.keys).then(
+    () => 'sent',
+    (e: Error) => `not sent: ${e.message}`.slice(0, 200),
+  );
+  const next = { ...index, devInfo };
+  await kvs.set(K.demoIndex, next);
+  return next;
 }
 
 export async function removeDemoBank(): Promise<void> {

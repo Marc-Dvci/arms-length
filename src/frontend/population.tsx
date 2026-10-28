@@ -65,8 +65,8 @@ function App() {
 
   useEffect(() => {
     load(null);
-    call<{ id: string; key: string; name: string }[]>('spaces')
-      .then((s) => setSpaces(s.map((x) => ({ label: `${x.name} (${x.key})`, value: x.id }))))
+    call<{ id: string; key: string; name: string; personal: boolean }[]>('spaces')
+      .then((s) => setSpaces(s.map((x) => ({ label: x.personal ? `${x.name} (personal space)` : `${x.name} (${x.key})`, value: x.id }))))
       .catch(() => setSpaces([]));
   }, []);
 
@@ -113,12 +113,9 @@ function App() {
 
   return (
     <Stack space="space.300">
-      <Stack space="space.100">
-        <Heading size="large">Change independence test</Heading>
-        <Text>
-          Every production deployment in the period, with the verdict of the change it shipped. Each change needs an approval from someone who did not request it, write it, or direct the agent that wrote it.
-        </Text>
-      </Stack>
+      <Text>
+        Every production deployment in the period, with the verdict of the change it shipped. Each change needs an approval from someone who did not request it, write it, or direct the agent that wrote it.
+      </Text>
 
       <Inline space="space.200" alignBlock="end" shouldWrap>
         <Field id="period" label="Period">
