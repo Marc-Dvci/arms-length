@@ -4,17 +4,50 @@ import type { ReviewRecord } from '../core/reviewers';
 /**
  * Review history from the Teamwork Graph: which people reviewed which pull requests.
  * Runs as the current user, so it only sees what that user may see.
+ *
+ * The Cypher is a persisted query owned by this app, executed with customQuery:
+ *   MATCH (u:AtlassianUser)-[:atlassian_user_reviewed_pull_requests]->(pr:ExternalPullRequest) RETURN u, pr
  */
-const REVIEWS_CYPHER = `MATCH (u:AtlassianUser)-[:atlassian_user_reviewed_pull_requests]->(pr:ExternalPullRequest)
-RETURN u, pr LIMIT 500`;
+export const REVIEWS_QUERY_KEY = '75a2ffe3-ae39-4542-b1f8-e2b7a868efd0';
+const PAGE_SIZE = 25;
+const MAX_PAGES = 20;
 
-const QUERY = `query ArmsLengthReviews($cypherQuery: String!) {
-  cypherQuery(query: $cypherQuery) {
-    edges { node { columns { key value } } }
+// Teamwork Graph requires operation names shaped company_operation.
+export const QUERY = `query armslength_reviews($queryKey: String!, $after: String) {
+  customQuery(queryKey: $queryKey, first: ${PAGE_SIZE}, after: $after) {
+    edges {
+      node {
+        columns {
+          key
+          value {
+            __typename
+            ... on CypherQueryResultNode {
+              id
+              data {
+                __typename
+                ... on AtlassianUser { accountId name }
+                ... on ExternalPullRequest { url displayName repositoryId lastUpdatedAt }
+              }
+            }
+          }
+        }
+      }
+    }
+    pageInfo { hasNextPage endCursor }
   }
 }`;
 
-const accountFromAri = (ari: string) => ari.split('/').at(-1) ?? ari;
+type Data = { accountId?: string; name?: string; url?: string; displayName?: string; repositoryId?: string; lastUpdatedAt?: string };
+export type GraphPage = {
+  data?: {
+    customQuery?: {
+      edges?: { node: { columns: { key: string; value?: { data?: Data } | null }[] } }[];
+      pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+    };
+  };
+  errors?: { message: string }[];
+};
+
 const repoFromUrl = (url: string) => url.match(/\/([^/]+)\/pull-requests?\//)?.[1] ?? url.match(/\/([^/]+)\/pull\//)?.[1];
 
 export interface GraphReviews {
@@ -23,28 +56,41 @@ export interface GraphReviews {
   error?: string;
 }
 
+/** Turns one page of (u, pr) rows into review records. Rows without a reviewer or a repository are skipped. */
+export function recordsFromPage(page: GraphPage): ReviewRecord[] {
+  const out: ReviewRecord[] = [];
+  for (const edge of page.data?.customQuery?.edges ?? []) {
+    const cols = Object.fromEntries(edge.node.columns.map((c) => [c.key, c.value?.data ?? {}]));
+    const reviewer = cols.u?.accountId;
+    const url = cols.pr?.url ?? '';
+    const repo = repoFromUrl(url);
+    if (!reviewer || !repo) continue;
+    out.push({ reviewer, repo, pr: url, at: cols.pr?.lastUpdatedAt ?? new Date(0).toISOString() });
+  }
+  return out;
+}
+
 export async function reviewsFromGraph(): Promise<GraphReviews> {
+  const records: ReviewRecord[] = [];
   try {
-    const res = await api.asUser().requestTeamworkGraph(QUERY, { cypherQuery: REVIEWS_CYPHER });
-    const body = (await res.json()) as {
-      data?: { cypherQuery?: { edges?: { node: { columns: { key: string; value: Record<string, unknown> } [] } }[] } };
-      errors?: { message: string }[];
-    };
-    if (!res.ok || body.errors?.length) return { records: [], source: 'unavailable', error: body.errors?.[0]?.message ?? `HTTP ${res.status}` };
-    const records: ReviewRecord[] = [];
-    for (const edge of body.data?.cypherQuery?.edges ?? []) {
-      const cols = Object.fromEntries(edge.node.columns.map((c) => [c.key, c.value as Record<string, unknown>]));
-      const user = cols.u ?? {};
-      const pr = cols.pr ?? {};
-      const data = (pr.data ?? pr) as Record<string, unknown>;
-      const ari = String(user.ari ?? user.id ?? (user.data as Record<string, unknown> | undefined)?.ari ?? '');
-      const url = String(data.url ?? '');
-      const repo = repoFromUrl(url);
-      if (!ari || !repo) continue;
-      records.push({ reviewer: accountFromAri(ari), repo, pr: url, at: String(data.lastUpdatedAt ?? data.lastUpdate ?? new Date(0).toISOString()) });
+    let after: string | null = null;
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const res = await api.asUser().requestTeamworkGraph(QUERY, { queryKey: REVIEWS_QUERY_KEY, after });
+      const body = (await res.json()) as GraphPage;
+      if (!res.ok || body.errors?.length) {
+        const error = body.errors?.[0]?.message ?? `HTTP ${res.status}`;
+        console.warn(`Teamwork Graph unavailable: ${error}`);
+        return { records, source: records.length ? 'teamwork-graph' : 'unavailable', error };
+      }
+      records.push(...recordsFromPage(body));
+      const info = body.data?.customQuery?.pageInfo;
+      if (!info?.hasNextPage || !info.endCursor) break;
+      after = info.endCursor;
     }
+    console.log(`Teamwork Graph: ${records.length} review records`);
     return { records, source: 'teamwork-graph' };
   } catch (e) {
-    return { records: [], source: 'unavailable', error: (e as Error).message };
+    console.warn(`Teamwork Graph unavailable: ${(e as Error).message}`);
+    return { records, source: records.length ? 'teamwork-graph' : 'unavailable', error: (e as Error).message };
   }
 }

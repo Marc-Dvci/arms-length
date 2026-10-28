@@ -1,6 +1,6 @@
 # Arm's Length: independent approval for agent-written code
 
-![tests](https://img.shields.io/badge/tests-120%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+![tests](https://img.shields.io/badge/tests-123%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
@@ -142,7 +142,7 @@ coding agent loads to call these tools before it opens a pull request.
 | `rovo:mcp` | `declare-agent-work`, `who-must-approve`, `change-evidence` for external MCP clients |
 | `rovo:agent`, `action`, `rovo:skill` | The Arm's Length agent, five actions, and the independence policy as a skill |
 | `devops:developmentInfoProvider`, `devops:deploymentInfoProvider` | The demo bank's pull requests and deployments in Jira's development panel |
-| Teamwork Graph API | Review history (who reviewed which pull requests) for reviewer suggestions |
+| Teamwork Graph API | Review history (who reviewed which pull requests) for reviewer suggestions, from a persisted Cypher query the app owns, run as the user with `customQuery` |
 | Confluence REST v2 | The workpaper page, created in the auditor's name |
 | `bitbucket:mergeCheck` | Sends each pull request's authors, approvals and pushes for a verdict, and shows it on the pull request |
 | `bitbucket:repoPullRequestCard`, `bitbucket:workspaceSettingsMenuPage` | The verdict on the pull request page; pairing |
@@ -192,7 +192,11 @@ signed in as a site admin outside the demo chains. Times are wall-clock in the b
 | **Approve as me**, then **Merge and deploy** | Verdict PASS, pull request merged, `prod-482` deployed, 1.3 s |
 | Raise exceptions as work items | 7 work items, 3.9 s |
 | Publish workpaper | Confluence page in the signed-in user's name, full width, 2.4 s |
-| `rovo:mcp` | Tools exposed to MCP clients from Atlassian Administration > Connected apps |
+| MCP client (OAuth 2.1 with PKCE, Streamable HTTP) to `mcp.atlassian.com/forge/<appId>` | `initialize` 115 ms, `tools/list` 334 ms: the three tools |
+| `declare-agent-work` over MCP on a new work item | Recorded the signed-in developer's account as principal, 3.7 s |
+| `who-must-approve` over MCP on the scene | Léa Martin's approval does not count; proposes Tom Becker (5 reviews in `payments-core`), 2.4 s |
+| `change-evidence` over MCP on a work item with no pull request | CANNOT DETERMINE under AL-8, with the evidence hash, 2.7 s |
+| Docker, `--network none` | Image built in 66 s; the demo prints the same quarter and evidence-set hash |
 
 **Real and synthetic.** The case sets and the demo bank are synthetic. The engine, the adapters and the Forge
 modules are the code that runs on a Jira site.
@@ -208,6 +212,7 @@ modules are the code that runs on a Jira site.
 | Drafts may cite only the evidence | [`src/core/guard.ts`](src/core/guard.ts) | `tests/core.test.ts` "draft guard"; `tests/forge.test.ts` "management responses" |
 | Signed requests only | [`src/core/signature.ts`](src/core/signature.ts), [`src/forge/webtrigger.ts`](src/forge/webtrigger.ts) | `tests/forge.test.ts` "rejects unsigned, forged and replayed requests" |
 | Every rule cites a regulation | [`src/core/rules.ts`](src/core/rules.ts) | `tests/evaluate.test.ts` "every rule carries at least one regulatory reference" |
+| Review history comes from the app's persisted Teamwork Graph query, page by page | [`src/forge/graph.ts`](src/forge/graph.ts) | `tests/graph.test.ts` "pages through the persisted query" |
 | The workpaper escapes markup | [`src/core/workpaper.ts`](src/core/workpaper.ts) | `tests/core.test.ts` "escapes markup in the workpaper" |
 
 ## Quickstart
@@ -216,7 +221,7 @@ No credentials:
 
 ```
 npm ci
-npm test          # 120 tests
+npm test          # 123 tests
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline

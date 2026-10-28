@@ -91,10 +91,22 @@ deployments are recorded and appear in the population test. Each attempt appears
    Arm's Length > Tools**.
 2. The app ID is the UUID at the end of `app.id` in `manifest.yml`.
 3. In the agent's MCP client, add the remote server `https://mcp.atlassian.com/forge/<appId>` over HTTP and sign
-   in with the developer's Atlassian account.
+   in with the developer's Atlassian account. For Claude Code:
+   `claude mcp add --transport http arms-length https://mcp.atlassian.com/forge/<appId>`, then `/mcp` to sign in.
+   An installation from a non-production environment names its tools with the environment as a suffix, for
+   example `who-must-approve_development`.
 4. Give the agent [`agent-skills/arms-length/SKILL.md`](../agent-skills/arms-length/SKILL.md).
 
 ## 9. Teamwork Graph
 
-Reviewer suggestions read review history from the Teamwork Graph when the app has access, and from the pull
-request snapshots otherwise. The Teamwork Graph API requires the app ID to be allowlisted by Atlassian support.
+Reviewer suggestions read review history from the Teamwork Graph, and add the pull request snapshots the
+Bitbucket app sends. The app runs one persisted Cypher query, owned by its app ID and executed as the signed-in
+user with `customQuery`, so each user sees only reviews they may see:
+
+```
+MATCH (u:AtlassianUser)-[:atlassian_user_reviewed_pull_requests]->(pr:ExternalPullRequest) RETURN u, pr
+```
+
+Its key is `REVIEWS_QUERY_KEY` in [`src/forge/graph.ts`](../src/forge/graph.ts). A fork registered under another
+app ID registers the same Cypher once (`POST /gateway/api/twg/cypher-queries` with its `appId`, from a signed-in
+browser session, or through TWG Labs) and replaces the key.
