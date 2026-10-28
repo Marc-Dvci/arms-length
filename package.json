@@ -5,7 +5,6 @@
   "license": "MIT",
   "private": true,
   "author": "Marc Donovici",
-  "type": "module",
   "engines": {
     "node": ">=22"
   },

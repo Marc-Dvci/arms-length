@@ -1,12 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { evaluate } from '../src/core/evaluate';
 import { RULES_VERSION } from '../src/core/rules';
 import type { VerdictValue } from '../src/core/types';
 import { loadCases, type LabelledCase } from './load';
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = __dirname;
 const CLASSES: VerdictValue[] = ['PASS', 'FAIL', 'CANNOT_DETERMINE'];
 
 export interface SetScore {
@@ -73,7 +72,7 @@ export function report(scores: SetScore[]): string {
   return parts.join('\n') + '\n';
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (require.main === module) {
   const scores = ['labelled.json', 'heldout.json'].map((f) => {
     const { set, cases } = loadCases(join(here, 'cases', f));
     return score(set, cases);

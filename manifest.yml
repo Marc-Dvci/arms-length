@@ -1,0 +1,262 @@
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
+  storage:
+    classifications:
+      - pii
+      - other
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - storage:app
+    - write:dev-info:jira
+    - delete:dev-info:jira
+    - write:deployment-info:jira
+    - delete:deployment-info:jira
+    - read:space:confluence
+    - write:page:confluence
+    - read:graph:pull-request:external
+    - read:graph:user:atlassian
+    - read:graph:issue:jira
+
+modules:
+  jira:issuePanel:
+    - key: arms-length-panel
+      title: Arm's Length
+      icon: resource:assets;icon.svg
+      resource: panel
+      render: native
+      resolver:
+        function: resolver
+
+  jira:globalPage:
+    - key: arms-length-population
+      title: Change independence test
+      icon: resource:assets;icon.svg
+      resource: population
+      render: native
+      resolver:
+        function: resolver
+
+  jira:adminPage:
+    - key: arms-length-admin
+      title: Arm's Length
+      resource: admin
+      render: native
+      useAsGetStarted: true
+      resolver:
+        function: resolver
+
+  jira:workflowValidator:
+    - key: arms-length-release-gate
+      name: Independent approval (Arm's Length)
+      description: Lets a work item through only when every pull request carries an approval from someone outside its change chain.
+      function: validate
+
+  jira:entityProperty:
+    - key: arms-length-index
+      entityType: issue
+      propertyKey: arms-length
+      values:
+        - path: verdict
+          type: string
+          searchAlias: armsLengthVerdict
+        - path: rule
+          type: string
+          searchAlias: armsLengthRule
+        - path: lastProductionDeploy
+          type: date
+          searchAlias: armsLengthDeployed
+
+  trigger:
+    - key: arms-length-issue-updated
+      function: on-issue-updated
+      events:
+        - avi:jira:updated:issue
+      filter:
+        ignoreSelf: true
+
+  webtrigger:
+    - key: arms-length-evidence
+      function: evidence
+      urlFormat: v2
+      response:
+        type: dynamic
+
+  action:
+    - key: declare-agent-work
+      name: Declare agent work
+      function: fn-declare-agent-work
+      actionVerb: CREATE
+      description: Records the calling user as the person directing a coding agent on a Jira work item, before the agent opens a pull request. Returns who must not approve and who can.
+      inputs:
+        workItem:
+          title: Work item key
+          type: string
+          required: true
+          description: The Jira work item the agent works on, for example PAY-482.
+        branch:
+          title: Branch
+          type: string
+          required: false
+          description: The branch the agent pushes to. Leave empty to cover every branch of the work item.
+        agent:
+          title: Agent name
+          type: string
+          required: false
+          description: A label for the agent, for example the client's name.
+    - key: who-must-approve
+      name: Who must approve
+      function: fn-who-must-approve
+      actionVerb: GET
+      description: Lists the people whose approval does not count for a work item's pull request (requester, authors, people who directed its agents) and proposes independent reviewers from recent review history.
+      inputs:
+        workItem:
+          title: Work item key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-482.
+        pullRequest:
+          title: Pull request
+          type: string
+          required: false
+          description: The pull request ID as repo#number. Leave empty for the open one.
+    - key: change-evidence
+      name: Change evidence
+      function: fn-change-evidence
+      actionVerb: GET
+      description: Returns the independence verdict of a work item with its rule, the approvals that count and do not count, its production deployments and the SHA-256 of the evidence.
+      inputs:
+        workItem:
+          title: Work item key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-482.
+    - key: population-test
+      name: Run the population test
+      function: fn-population-test
+      actionVerb: GET
+      description: Runs the change independence test over every production deployment in a period and returns the counts, the exceptions and the evidence-set hash.
+      inputs:
+        from:
+          title: From
+          type: string
+          required: false
+          description: Start of the period, ISO date, inclusive. Defaults to the last full quarter.
+        to:
+          title: To
+          type: string
+          required: false
+          description: End of the period, ISO date, exclusive.
+    - key: post-management-response
+      name: Post management response
+      function: fn-management-response
+      actionVerb: CREATE
+      description: Posts a management response to a change independence exception as a comment on the work item, after checking that every person, number and date in it appears in the change evidence.
+      inputs:
+        workItem:
+          title: Work item key
+          type: string
+          required: true
+          description: The work item the exception is about.
+        response:
+          title: Response
+          type: string
+          required: true
+          description: The full text of the management response.
+
+  rovo:mcp:
+    - key: arms-length-mcp
+      name: Arm's Length
+      tools:
+        - declare-agent-work
+        - who-must-approve
+        - change-evidence
+
+  rovo:skill:
+    - key: independence-policy
+      source:
+        dir: skills/independence-policy
+      dependencies:
+        tools:
+          - who-must-approve
+          - change-evidence
+          - population-test
+          - post-management-response
+
+  rovo:agent:
+    - key: arms-length-agent
+      name: Arm's Length
+      description: Explains independence verdicts on agent-written changes, names who can approve, and drafts management responses that cite only the evidence.
+      icon: resource:assets;icon.svg
+      prompt: resource:prompts;agent.md
+      conversationStarters:
+        - Who should approve this work item, and why can the others not?
+        - Explain this verdict to an auditor
+        - Run the change independence test for the last quarter
+        - Draft a management response for this exception
+      actions:
+        - who-must-approve
+        - change-evidence
+        - population-test
+        - post-management-response
+      skills:
+        - independence-policy
+
+  devops:developmentInfoProvider:
+    - key: arms-length-demo-dev
+      name:
+        value: Arm's Length demo bank
+      homeUrl: https://github.com/Marc-Dvci/arms-length
+      documentationUrl: https://github.com/Marc-Dvci/arms-length/blob/main/docs/demo-bank.md
+
+  devops:deploymentInfoProvider:
+    - key: arms-length-demo-deploy
+      name:
+        value: Arm's Length demo bank
+      homeUrl: https://github.com/Marc-Dvci/arms-length
+      documentationUrl: https://github.com/Marc-Dvci/arms-length/blob/main/docs/demo-bank.md
+
+  function:
+    - key: resolver
+      handler: index.resolver
+    - key: validate
+      handler: index.validate
+    - key: evidence
+      handler: index.evidence
+    - key: on-issue-updated
+      handler: index.onIssueUpdated
+    - key: fn-declare-agent-work
+      handler: index.declareAgentWork
+    - key: fn-who-must-approve
+      handler: index.whoMustApprove
+    - key: fn-change-evidence
+      handler: index.changeEvidence
+    - key: fn-population-test
+      handler: index.populationTest
+      timeoutSeconds: 55
+    - key: fn-management-response
+      handler: index.managementResponse
+
+resources:
+  - key: panel
+    path: src/frontend/panel.tsx
+  - key: population
+    path: src/frontend/population.tsx
+  - key: admin
+    path: src/frontend/admin.tsx
+  - key: assets
+    path: static/assets
+  - key: prompts
+    path: prompts
