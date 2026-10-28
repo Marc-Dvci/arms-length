@@ -34,16 +34,18 @@ export interface FakeSite {
   comments: Record<string, unknown[]>;
   created: { fields: Record<string, unknown> }[];
   devops: unknown[];
+  confluence: { method: string; path: string; body?: { key?: string; value?: string; spaceId?: string; title?: string } }[];
+  confluenceTitles: Set<string>;
   failChangelog: Set<string>;
   rejectLabels: boolean;
 }
 
-export const site: FakeSite = { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set(), rejectLabels: false };
+export const site: FakeSite = { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], confluence: [], confluenceTitles: new Set(), failChangelog: new Set(), rejectLabels: false };
 
 export function resetSite() {
   memory.store.clear();
   memory.secrets.clear();
-  Object.assign(site, { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set(), rejectLabels: false });
+  Object.assign(site, { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], confluence: [], confluenceTitles: new Set(), failChangelog: new Set(), rejectLabels: false });
 }
 
 const ok = (body: unknown, status = 200) =>
@@ -107,6 +109,28 @@ export async function fakeRequestJira(path: string, init?: RequestInit): Promise
     return ok({ acceptedRepositories: [] }, 202);
   }
   return ok({ errorMessages: [`unhandled ${method} ${p}`] }, 404);
+}
+
+/** Confluence REST as the app sees it: pages and page properties, recorded in site.confluence. */
+export async function fakeRequestConfluence(path: string, init?: RequestInit): Promise<Response> {
+  const url = new URL(path, 'https://site.atlassian.net');
+  const method = init?.method ?? 'GET';
+  const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+  site.confluence.push({ method, path: url.pathname, body });
+  const reply = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
+  if (url.pathname === '/wiki/api/v2/spaces') {
+    return reply({ results: [
+      { id: '9', key: '~7120200a', name: 'Marc Donovici', type: 'personal' },
+      { id: '7', key: 'SD', name: 'Software development', type: 'onboarding' },
+    ] });
+  }
+  if (url.pathname === '/wiki/api/v2/pages' && method === 'POST') {
+    if (site.confluenceTitles.has(body.title)) return reply({ errors: [{ title: 'A page with this title already exists' }] }, 400);
+    site.confluenceTitles.add(body.title);
+  }
+  if (url.pathname === '/wiki/api/v2/pages' && method === 'POST') return reply({ id: '622595', _links: { base: 'https://site.atlassian.net/wiki', webui: '/spaces/SD/pages/622595' } });
+  if (/^\/wiki\/api\/v2\/pages\/\d+\/properties$/.test(url.pathname) && method === 'POST') return reply({ id: '1', key: body.key, value: body.value });
+  return reply({ message: `unhandled ${method} ${url.pathname}` }, 404);
 }
 
 /** route`` as Forge implements it: interpolated values are URL-encoded. */

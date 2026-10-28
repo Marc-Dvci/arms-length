@@ -22,28 +22,32 @@ const issueKeyOf = (payload: { issueKey?: string }, context: Ctx) => {
   return key;
 };
 
-async function panel(key: string) {
+async function panel(key: string, caller?: string) {
   const a = await assessIssue(key);
   const view = panelView(a.chain, a.verdict, a.source);
   const scene = a.source === 'demo' ? await demoSceneKey() : null;
-  const open = a.chain.pullRequests.some((p) => p.state === 'OPEN');
-  return { ...view, demo: { isScene: scene === key, canApprove: a.source === 'demo' && open, canShip: a.source === 'demo' && open } };
+  const open = a.chain.pullRequests.find((p) => p.state === 'OPEN');
+  const head = open?.commits.at(-1)?.hash;
+  const approvedByCaller = !!open && open.reviews.some((r) => r.by === caller && r.action === 'approved' && r.commit === head);
+  return { ...view, demo: { isScene: scene === key, canApprove: a.source === 'demo' && !!open && !approvedByCaller, canShip: a.source === 'demo' && !!open } };
 }
 
-resolver.define('panel', async ({ payload, context }) => panel(issueKeyOf(payload, context as Ctx)));
+resolver.define('panel', async ({ payload, context }) => panel(issueKeyOf(payload, context as Ctx), (context as Ctx).accountId));
 
 resolver.define('who', async ({ payload, context }) => whoMustApprove(issueKeyOf(payload, context as Ctx)));
 
 resolver.define('demoApprove', async ({ payload, context }) => {
   const key = issueKeyOf(payload, context as Ctx);
-  await demoApprove(key, callerOf(context as Ctx));
-  return panel(key);
+  const caller = callerOf(context as Ctx);
+  await demoApprove(key, caller);
+  return panel(key, caller);
 });
 
 resolver.define('demoShip', async ({ payload, context }) => {
   const key = issueKeyOf(payload, context as Ctx);
-  const out = await demoShip(key, callerOf(context as Ctx));
-  return { ...(await panel(key)), shipMessage: out.message, shipped: out.shipped };
+  const caller = callerOf(context as Ctx);
+  const out = await demoShip(key, caller);
+  return { ...(await panel(key, caller)), shipMessage: out.message, shipped: out.shipped };
 });
 
 resolver.define('population', async ({ payload }) => {

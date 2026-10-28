@@ -25,6 +25,7 @@ permissions:
     - write:deployment-info:jira
     - delete:deployment-info:jira
     - read:space:confluence
+    - read:page:confluence
     - write:page:confluence
     - read:graph:pull-request:external
     - read:graph:user:atlassian

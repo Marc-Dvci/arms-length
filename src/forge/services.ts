@@ -155,17 +155,35 @@ export async function listSpaces(): Promise<{ id: string; key: string; name: str
 /** Publishes the workpaper as a Confluence page created by the person running the test. */
 export async function publishWorkpaper(result: PopulationResult, spaceId: string, links: Record<string, string>, preparedBy: string): Promise<string> {
   const base = await siteUrl();
-  const wp = buildWorkpaper(result, { site: new URL(base).host, preparedBy, preparedAt: new Date().toISOString(), exceptionLinks: links });
+  const preparedAt = new Date().toISOString();
+  const wp = buildWorkpaper(result, { site: new URL(base).host, preparedBy, preparedAt, exceptionLinks: links });
   const post = (title: string) =>
     api.asUser().requestConfluence(route`/wiki/api/v2/pages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ spaceId, status: 'current', title, body: { representation: 'storage', value: wp.storage } }),
     });
+  // Confluence refuses a title already used in the space: add the evidence hash, then the time of this run.
+  const taken = (r: { status: number }) => r.status === 400 || r.status === 409;
+  const hash = result.evidenceSetHash.slice(0, 8);
   let res = await post(wp.title);
-  if (res.status === 400 || res.status === 409) res = await post(`${wp.title} (${result.evidenceSetHash.slice(0, 8)})`);
+  if (taken(res)) res = await post(`${wp.title} (${hash})`);
+  if (taken(res)) res = await post(`${wp.title} (${hash}, ${preparedAt.slice(0, 19).replace('T', ' ')} UTC)`);
   if (!res.ok) throw new Error(`The workpaper could not be published (${res.status}).`);
   const page = (await res.json()) as { id: string; _links?: { webui?: string; base?: string } };
+  // Full width, so the population table keeps one line per deployment.
+  await Promise.all(
+    ['content-appearance-published', 'content-appearance-draft'].map((key) =>
+      api
+        .asUser()
+        .requestConfluence(route`/wiki/api/v2/pages/${page.id}/properties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: 'full-width' }),
+        })
+        .catch(() => undefined),
+    ),
+  );
   return page._links?.webui ? `${page._links.base ?? `${base}/wiki`}${page._links.webui}` : `${base}/wiki/pages/viewpage.action?pageId=${page.id}`;
 }
 
