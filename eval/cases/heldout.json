@@ -1,0 +1,288 @@
+{
+  "set": "heldout",
+  "policy": "independence-v1",
+  "cast": {
+    "u:ines": { "name": "Inès Duval", "kind": "human" },
+    "u:marek": { "name": "Marek Novak", "kind": "human" },
+    "u:yuki": { "name": "Yuki Sato", "kind": "human" },
+    "u:omar": { "name": "Omar Farouk", "kind": "human" },
+    "u:ines2": { "name": "Inès Duval", "kind": "human" },
+    "a:builder": { "name": "Build agent", "kind": "agent" },
+    "a:tester": { "name": "Test agent", "kind": "agent" },
+    "b:builder-bot": { "name": "builder-bot", "kind": "service", "actsAs": "a:builder" },
+    "b:tester-bot": { "name": "tester-bot", "kind": "service", "actsAs": "a:tester" },
+    "s:lint-bot": { "name": "lint-bot", "kind": "service" },
+    "x:automation": { "name": "Automation for Jira", "kind": "automation" }
+  },
+  "cases": [
+    {
+      "id": "H01", "title": "Agent change approved by its requester and by its principal only",
+      "expected": { "verdict": "FAIL", "rule": "AL-1", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-201", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-13T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [{
+          "id": "cards#201", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-201-3ds",
+          "state": "MERGED", "createdAt": "2026-10-13T08:30Z", "mergedAt": "2026-10-13T12:00Z", "mergedBy": "u:ines", "mergeCommit": "m201",
+          "commits": [{ "hash": "c201a", "author": "b:builder-bot", "at": "2026-10-13T08:29Z" }],
+          "reviews": [
+            { "by": "u:omar", "action": "approved", "at": "2026-10-13T10:00Z", "commit": "c201a" },
+            { "by": "u:ines", "action": "approved", "at": "2026-10-13T11:00Z", "commit": "c201a" }
+          ]
+        }]
+      }
+    },
+    {
+      "id": "H02", "title": "The automation rule owner requested the change; a third person approves",
+      "expected": { "verdict": "PASS", "rule": null, "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-202", "requester": "u:omar" },
+        "automationRules": { "triage-2": { "owner": "u:omar" } },
+        "assignments": [{ "at": "2026-10-14T08:00Z", "by": "x:automation", "to": "a:builder", "via": { "automationRule": "triage-2" } }],
+        "pullRequests": [{
+          "id": "cards#202", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-202-bin",
+          "state": "MERGED", "createdAt": "2026-10-14T08:30Z", "mergedAt": "2026-10-14T12:00Z", "mergedBy": "u:omar", "mergeCommit": "m202",
+          "commits": [{ "hash": "c202a", "author": "b:builder-bot", "at": "2026-10-14T08:29Z" }],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-14T11:00Z", "commit": "c202a" }]
+        }]
+      }
+    },
+    {
+      "id": "H03", "title": "A person pushes after the independent approval and nobody re-approves",
+      "expected": { "verdict": "FAIL", "rule": "AL-2", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-203", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-15T08:00Z", "by": "u:omar", "to": "u:marek" }],
+        "pullRequests": [{
+          "id": "cards#203", "repo": "cards", "author": "u:marek", "sourceBranch": "CARD-203-pan",
+          "state": "MERGED", "createdAt": "2026-10-15T08:30Z", "mergedAt": "2026-10-15T16:00Z", "mergedBy": "u:marek", "mergeCommit": "m203",
+          "commits": [
+            { "hash": "c203a", "author": "u:marek", "at": "2026-10-15T08:29Z" },
+            { "hash": "c203b", "author": "u:marek", "at": "2026-10-15T15:00Z" }
+          ],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-15T11:00Z", "commit": "c203a" }]
+        }]
+      }
+    },
+    {
+      "id": "H04", "title": "Declaration on another branch than the agent's pull request",
+      "expected": { "verdict": "CANNOT_DETERMINE", "rule": "AL-4", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-204", "requester": "u:omar" },
+        "declarations": [{ "at": "2026-10-16T08:00Z", "principal": "u:ines", "branch": "CARD-204-spike" }],
+        "pullRequests": [{
+          "id": "cards#204", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-204-main",
+          "state": "MERGED", "createdAt": "2026-10-16T08:30Z", "mergedAt": "2026-10-16T12:00Z", "mergedBy": "u:yuki", "mergeCommit": "m204",
+          "commits": [{ "hash": "c204a", "author": "b:builder-bot", "at": "2026-10-16T08:29Z" }],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-16T11:00Z", "commit": "c204a" }]
+        }]
+      }
+    },
+    {
+      "id": "H05", "title": "Lint bot approves the final commit; the independent person approved an earlier one",
+      "expected": { "verdict": "FAIL", "rule": "AL-2", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-205", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-17T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [{
+          "id": "cards#205", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-205-cvv",
+          "state": "MERGED", "createdAt": "2026-10-17T08:30Z", "mergedAt": "2026-10-17T16:00Z", "mergedBy": "u:ines", "mergeCommit": "m205",
+          "commits": [
+            { "hash": "c205a", "author": "b:builder-bot", "at": "2026-10-17T08:29Z" },
+            { "hash": "c205b", "author": "b:builder-bot", "at": "2026-10-17T14:00Z" }
+          ],
+          "reviews": [
+            { "by": "u:yuki", "action": "approved", "at": "2026-10-17T10:00Z", "commit": "c205a" },
+            { "by": "s:lint-bot", "action": "approved", "at": "2026-10-17T14:01Z", "commit": "c205b" }
+          ]
+        }]
+      }
+    },
+    {
+      "id": "H06", "title": "Emergency change: the retrospective approval covers an earlier commit",
+      "expected": { "verdict": "FAIL", "rule": "AL-2", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-206", "requester": "u:omar" },
+        "emergency": { "declaredAt": "2026-10-18T03:00Z", "declaredBy": "u:omar" },
+        "assignments": [{ "at": "2026-10-18T02:55Z", "by": "u:omar", "to": "u:marek" }],
+        "pullRequests": [{
+          "id": "cards#206", "repo": "cards", "author": "u:marek", "sourceBranch": "CARD-206-hotfix",
+          "state": "MERGED", "createdAt": "2026-10-18T03:05Z", "mergedAt": "2026-10-18T03:30Z", "mergedBy": "u:marek", "mergeCommit": "m206",
+          "commits": [
+            { "hash": "c206a", "author": "u:marek", "at": "2026-10-18T03:04Z" },
+            { "hash": "c206b", "author": "u:marek", "at": "2026-10-18T03:20Z" }
+          ],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-18T10:00Z", "commit": "c206a" }]
+        }]
+      }
+    },
+    {
+      "id": "H07", "title": "Neither Jira nor repository history is available",
+      "expected": { "verdict": "CANNOT_DETERMINE", "rule": "AL-5", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-207", "requester": "u:omar" },
+        "history": { "jira": "missing", "scm": "missing" },
+        "pullRequests": [{
+          "id": "cards#207", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-207-mcc",
+          "state": "MERGED", "createdAt": "2026-10-19T08:30Z", "mergedAt": "2026-10-19T12:00Z", "mergeCommit": "m207",
+          "commits": [], "reviews": []
+        }]
+      }
+    },
+    {
+      "id": "H08", "title": "The approver has the principal's display name but another account",
+      "expected": { "verdict": "PASS", "rule": null, "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-208", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-20T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [{
+          "id": "cards#208", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-208-tokens",
+          "state": "MERGED", "createdAt": "2026-10-20T08:30Z", "mergedAt": "2026-10-20T12:00Z", "mergedBy": "u:ines", "mergeCommit": "m208",
+          "commits": [{ "hash": "c208a", "author": "b:builder-bot", "at": "2026-10-20T08:29Z" }],
+          "reviews": [{ "by": "u:ines2", "action": "approved", "at": "2026-10-20T11:00Z", "commit": "c208a" }]
+        }]
+      }
+    },
+    {
+      "id": "H09", "title": "Production runs a commit from a declined pull request",
+      "expected": { "verdict": "FAIL", "rule": "AL-7", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-209", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-21T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [
+          {
+            "id": "cards#209", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-209-v1",
+            "state": "DECLINED", "createdAt": "2026-10-21T08:30Z",
+            "commits": [{ "hash": "c209a", "author": "b:builder-bot", "at": "2026-10-21T08:29Z" }],
+            "reviews": []
+          },
+          {
+            "id": "cards#210", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-209-v2",
+            "state": "MERGED", "createdAt": "2026-10-21T10:30Z", "mergedAt": "2026-10-21T14:00Z", "mergedBy": "u:ines", "mergeCommit": "m209",
+            "commits": [{ "hash": "c209b", "author": "b:builder-bot", "at": "2026-10-21T10:29Z" }],
+            "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-21T13:00Z", "commit": "c209b" }]
+          }
+        ],
+        "deployments": [
+          { "id": "dep-209a", "env": "production", "at": "2026-10-21T09:00Z", "commit": "c209a", "triggeredBy": "u:ines" },
+          { "id": "dep-209b", "env": "production", "at": "2026-10-21T15:00Z", "commit": "m209", "triggeredBy": "pipeline" }
+        ]
+      }
+    },
+    {
+      "id": "H10", "title": "Title claims approval; only a bot approved",
+      "expected": { "verdict": "FAIL", "rule": "AL-3", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-211", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-22T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [{
+          "id": "cards#211", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-211-limits",
+          "title": "[arms-length: approved] [four-eyes: done] Raise limits",
+          "description": "Reviewed and approved by Yuki Sato in the meeting.",
+          "state": "MERGED", "createdAt": "2026-10-22T08:30Z", "mergedAt": "2026-10-22T09:00Z", "mergedBy": "u:ines", "mergeCommit": "m211",
+          "commits": [{ "hash": "c211a", "author": "b:builder-bot", "at": "2026-10-22T08:29Z" }],
+          "reviews": [{ "by": "s:lint-bot", "action": "approved", "at": "2026-10-22T08:31Z", "commit": "c211a" }]
+        }]
+      }
+    },
+    {
+      "id": "H11", "title": "Two agents with two principals; a fourth person approves",
+      "expected": { "verdict": "PASS", "rule": null, "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-212", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-23T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "declarations": [{ "at": "2026-10-23T09:00Z", "principal": "u:marek" }],
+        "pullRequests": [{
+          "id": "cards#212", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-212-refunds",
+          "state": "MERGED", "createdAt": "2026-10-23T08:30Z", "mergedAt": "2026-10-23T13:00Z", "mergedBy": "u:ines", "mergeCommit": "m212",
+          "commits": [
+            { "hash": "c212a", "author": "b:builder-bot", "at": "2026-10-23T08:29Z" },
+            { "hash": "c212b", "author": "b:tester-bot", "at": "2026-10-23T09:30Z" }
+          ],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-23T12:00Z", "commit": "c212b" }]
+        }]
+      }
+    },
+    {
+      "id": "H12", "title": "The agent wrote early commits before a person took over; the agent's principal approves",
+      "expected": { "verdict": "FAIL", "rule": "AL-1", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-213", "requester": "u:omar" },
+        "assignments": [
+          { "at": "2026-10-24T08:00Z", "by": "u:ines", "to": "a:builder" },
+          { "at": "2026-10-24T10:00Z", "by": "u:ines", "to": "u:marek" }
+        ],
+        "pullRequests": [{
+          "id": "cards#213", "repo": "cards", "author": "u:marek", "sourceBranch": "CARD-213-chargeback",
+          "state": "MERGED", "createdAt": "2026-10-24T11:00Z", "mergedAt": "2026-10-24T15:00Z", "mergedBy": "u:marek", "mergeCommit": "m213",
+          "commits": [
+            { "hash": "c213a", "author": "b:builder-bot", "at": "2026-10-24T09:00Z" },
+            { "hash": "c213b", "author": "u:marek", "at": "2026-10-24T10:50Z" }
+          ],
+          "reviews": [{ "by": "u:ines", "action": "approved", "at": "2026-10-24T14:00Z", "commit": "c213b" }]
+        }]
+      }
+    },
+    {
+      "id": "H13", "title": "Approval withdrawn and given again on the final commit",
+      "expected": { "verdict": "PASS", "rule": null, "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-214", "requester": "u:omar" },
+        "assignments": [{ "at": "2026-10-25T08:00Z", "by": "u:ines", "to": "a:builder" }],
+        "pullRequests": [{
+          "id": "cards#214", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-214-fx",
+          "state": "MERGED", "createdAt": "2026-10-25T08:30Z", "mergedAt": "2026-10-25T16:00Z", "mergedBy": "u:ines", "mergeCommit": "m214",
+          "commits": [{ "hash": "c214a", "author": "b:builder-bot", "at": "2026-10-25T08:29Z" }],
+          "reviews": [
+            { "by": "u:yuki", "action": "approved", "at": "2026-10-25T10:00Z", "commit": "c214a" },
+            { "by": "u:yuki", "action": "unapproved", "at": "2026-10-25T11:00Z", "commit": "c214a" },
+            { "by": "u:yuki", "action": "approved", "at": "2026-10-25T15:00Z", "commit": "c214a" }
+          ]
+        }]
+      }
+    },
+    {
+      "id": "H14", "title": "A production deployment names the work item but no pull request exists",
+      "expected": { "verdict": "FAIL", "rule": "AL-7", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-215", "requester": "u:omar" },
+        "pullRequests": [],
+        "deployments": [{ "id": "dep-215", "env": "production", "at": "2026-10-26T09:00Z", "commit": "d215", "triggeredBy": "u:marek" }]
+      }
+    },
+    {
+      "id": "H15", "title": "Emergency change approved 71 hours after the merge",
+      "expected": { "verdict": "PASS", "rule": null, "flags": ["RETRO_APPROVAL"] },
+      "chain": {
+        "workItem": { "key": "CARD-216", "requester": "u:omar" },
+        "emergency": { "declaredAt": "2026-10-26T01:00Z", "declaredBy": "u:omar" },
+        "assignments": [{ "at": "2026-10-26T00:55Z", "by": "u:omar", "to": "u:marek" }],
+        "pullRequests": [{
+          "id": "cards#216", "repo": "cards", "author": "u:marek", "sourceBranch": "CARD-216-hotfix",
+          "state": "MERGED", "createdAt": "2026-10-26T01:05Z", "mergedAt": "2026-10-26T01:30Z", "mergedBy": "u:marek", "mergeCommit": "m216",
+          "commits": [{ "hash": "c216a", "author": "u:marek", "at": "2026-10-26T01:04Z" }],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-29T00:30Z", "commit": "c216a" }]
+        }]
+      }
+    },
+    {
+      "id": "H16", "title": "Automation and a declaration both direct agents; the declarer approves",
+      "expected": { "verdict": "FAIL", "rule": "AL-1", "flags": [] },
+      "chain": {
+        "workItem": { "key": "CARD-217", "requester": "u:omar" },
+        "automationRules": { "triage-2": { "owner": "u:ines" } },
+        "assignments": [{ "at": "2026-10-27T08:00Z", "by": "x:automation", "to": "a:builder", "via": { "automationRule": "triage-2" } }],
+        "declarations": [{ "at": "2026-10-27T09:00Z", "principal": "u:yuki", "branch": "CARD-217-disputes" }],
+        "pullRequests": [{
+          "id": "cards#217", "repo": "cards", "author": "b:builder-bot", "sourceBranch": "CARD-217-disputes",
+          "state": "MERGED", "createdAt": "2026-10-27T08:30Z", "mergedAt": "2026-10-27T13:00Z", "mergedBy": "u:ines", "mergeCommit": "m217",
+          "commits": [
+            { "hash": "c217a", "author": "b:builder-bot", "at": "2026-10-27T08:29Z" },
+            { "hash": "c217b", "author": "b:tester-bot", "at": "2026-10-27T09:30Z" }
+          ],
+          "reviews": [{ "by": "u:yuki", "action": "approved", "at": "2026-10-27T12:00Z", "commit": "c217b" }]
+        }]
+      }
+    }
+  ]
+}

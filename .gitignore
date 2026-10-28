@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.forge/
+.env
+.env.*
+*.log
+test-results/
+playwright-report/
+out/
