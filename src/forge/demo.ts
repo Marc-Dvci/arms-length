@@ -3,7 +3,7 @@ import { gateMessage } from '../core/explain';
 import type { ChangeChain, Ref } from '../core/types';
 import { buildDemoBank, DEMO_OPEN_ITEM, DEMO_ROLES } from '../demo/bank';
 import { assessIssue } from './chain';
-import { createIssue, deleteDevOpsByProperty, getProject, getUser, postDevOps } from './jira';
+import { createIssues, deleteDevOpsByProperty, getProject, getUser, postDevOps } from './jira';
 import { getDemoChain, getDemoIndex, kvs, K, listByPrefix, type DemoIndex } from './store';
 
 const REPO_URL = 'https://github.com/Marc-Dvci/arms-length';
@@ -78,6 +78,11 @@ async function pushDevInfo(chains: ChangeChain[], demoKeys: Record<string, strin
   return { demoKeys };
 }
 
+/** Runs async work in parallel batches, to stay inside the resolver's time limit. */
+async function inBatches<T>(items: T[], size: number, fn: (t: T) => Promise<unknown>) {
+  for (let i = 0; i < items.length; i += size) await Promise.all(items.slice(i, i + size).map(fn));
+}
+
 /** Creates the demo bank's work items in a project and stores their change chains. */
 export async function loadDemoBank(projectKey: string, caller: Ref): Promise<DemoIndex> {
   const existing = await getDemoIndex();
@@ -85,10 +90,9 @@ export async function loadDemoBank(projectKey: string, caller: Ref): Promise<Dem
   const project = await getProject(projectKey);
   const type = project.issueTypes?.find((t) => !t.subtask && /task|story/i.test(t.name)) ?? project.issueTypes?.find((t) => !t.subtask);
   const bank = buildDemoBank();
-  const keys: Record<string, string> = {};
-  for (const c of bank) {
-    const roles = Object.entries(DEMO_ROLES).map(([ref, role]) => `${c.people[ref]?.name}: ${role}`).join('; ');
-    const created = await createIssue({
+  const roles = Object.entries(DEMO_ROLES).map(([ref, role]) => `${bank[0].people[ref]?.name}: ${role}`).join('; ');
+  const created = await createIssues(
+    bank.map((c) => ({
       project: { key: project.key },
       issuetype: type ? { id: type.id } : { name: 'Task' },
       summary: `${c.workItem.summary} [${c.workItem.key}]`,
@@ -101,15 +105,19 @@ export async function loadDemoBank(projectKey: string, caller: Ref): Promise<Dem
           { type: 'paragraph', content: [{ type: 'text', text: `Synthetic team: ${roles}.` }] },
         ],
       },
-    });
-    keys[c.workItem.key] = created.key;
-  }
+    })),
+  );
+  const keys: Record<string, string> = {};
+  bank.forEach((c, i) => (keys[c.workItem.key] = created[i]));
   const chains = bank.map((c) => rekey(c, keys));
-  for (const c of chains) await kvs.set(K.demoChain(c.workItem.key), c);
-  const index: DemoIndex = { projectKey: project.key, loadedAt: new Date().toISOString(), loadedBy: caller, keys };
+  await inBatches(chains, 10, (c) => kvs.set(K.demoChain(c.workItem.key), c));
+  const devInfo = await pushDevInfo(chains, keys).then(
+    () => 'sent',
+    (e: Error) => `not sent: ${e.message}`.slice(0, 200),
+  );
+  const index: DemoIndex = { projectKey: project.key, loadedAt: new Date().toISOString(), loadedBy: caller, keys, devInfo };
   await kvs.set(K.demoIndex, index);
-  await pushDevInfo(chains, keys).catch(() => undefined);
-  for (const c of chains) await assessIssue(c.workItem.key).catch(() => undefined);
+  await inBatches(chains, 10, (c) => assessIssue(c.workItem.key).catch(() => undefined));
   return index;
 }
 

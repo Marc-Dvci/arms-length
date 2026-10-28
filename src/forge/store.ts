@@ -54,6 +54,8 @@ export interface DemoIndex {
   loadedBy: Ref;
   /** Demo key (PAY-431) to the work item key created on this site. */
   keys: Record<string, string>;
+  /** Whether the pull requests and deployments reached Jira's development panel. */
+  devInfo?: string;
 }
 
 export async function getConfig(): Promise<AppConfig> {

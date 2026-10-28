@@ -35,14 +35,15 @@ export interface FakeSite {
   created: { fields: Record<string, unknown> }[];
   devops: unknown[];
   failChangelog: Set<string>;
+  rejectLabels: boolean;
 }
 
-export const site: FakeSite = { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set() };
+export const site: FakeSite = { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set(), rejectLabels: false };
 
 export function resetSite() {
   memory.store.clear();
   memory.secrets.clear();
-  Object.assign(site, { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set() });
+  Object.assign(site, { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], failChangelog: new Set(), rejectLabels: false });
 }
 
 const ok = (body: unknown, status = 200) =>
@@ -70,6 +71,17 @@ export async function fakeRequestJira(path: string, init?: RequestInit): Promise
     const key = decodeURIComponent(m[1]);
     site.comments[key] = [...(site.comments[key] ?? []), JSON.parse(String(init?.body))];
     return ok({ id: String(site.comments[key].length) }, 201);
+  }
+  if (p === '/rest/api/3/issue/bulk' && method === 'POST') {
+    const body = JSON.parse(String(init?.body)) as { issueUpdates: { fields: Record<string, unknown> }[] };
+    const issues: { key: string }[] = [];
+    const errors: { failedElementNumber: number }[] = [];
+    body.issueUpdates.forEach((u, i) => {
+      if (site.rejectLabels && u.fields.labels) return errors.push({ failedElementNumber: i });
+      site.created.push({ fields: u.fields });
+      issues.push({ key: `PAY-${site.created.length}` });
+    });
+    return ok({ issues, errors }, 201);
   }
   if (p === '/rest/api/3/issue' && method === 'POST') {
     const body = JSON.parse(String(init?.body));

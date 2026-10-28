@@ -1,6 +1,6 @@
 # Arm's Length: independent approval for agent-written code
 
-![tests](https://img.shields.io/badge/tests-113%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+![tests](https://img.shields.io/badge/tests-117%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
@@ -197,7 +197,7 @@ No credentials:
 
 ```
 npm ci
-npm test          # 113 tests
+npm test          # 117 tests
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline

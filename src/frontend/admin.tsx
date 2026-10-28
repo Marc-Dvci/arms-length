@@ -143,6 +143,7 @@ function App() {
                 <Stack space="space.100">
                   <Text>{`Loaded into ${data.demo.projectKey} on ${data.demo.loadedAt.slice(0, 16).replace('T', ' ')} UTC: ${Object.keys(data.demo.keys).length} work items.`}</Text>
                   <Text>{`The scene: open ${data.demo.keys['PAY-482']} (demo PAY-482). Its only approval comes from the person who requested the change and directed the coding agent.`}</Text>
+                  {data.demo.devInfo && data.demo.devInfo !== 'sent' ? <Text color="color.text.subtle">{`Development panel: ${data.demo.devInfo}. Verdicts do not depend on it.`}</Text> : null}
                   <Inline space="space.100">
                     <Button appearance="warning" isDisabled={!!busy} onClick={() => act('remove', () => call('removeDemo'), 'Demo bank removed. The work items stay in the project.')}>
                       Remove demo data

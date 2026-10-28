@@ -72,6 +72,35 @@ export async function createIssue(fields: Record<string, unknown>): Promise<{ id
   return json(res, 'Creating a work item');
 }
 
+/**
+ * Creates work items in one call (Jira accepts up to 50). Items Jira rejects are retried with only
+ * project, type and summary, for projects whose create screen lacks labels or description.
+ */
+export async function createIssues(items: Record<string, unknown>[]): Promise<string[]> {
+  const keys: string[] = [];
+  for (let i = 0; i < items.length; i += 50) {
+    const batch = items.slice(i, i + 50);
+    const res = await api.asApp().requestJira(route`/rest/api/3/issue/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueUpdates: batch.map((fields) => ({ fields })) }),
+    });
+    const body = (await res.json()) as { issues?: { key: string }[]; errors?: { failedElementNumber: number }[] };
+    const failed = new Set((body.errors ?? []).map((e) => e.failedElementNumber));
+    const created = [...(body.issues ?? [])];
+    for (let j = 0; j < batch.length; j++) {
+      if (!failed.has(j) && res.ok) {
+        keys.push(created.shift()!.key);
+        continue;
+      }
+      if (!failed.has(j)) created.shift();
+      const { project, issuetype, summary } = batch[j] as { project: unknown; issuetype: unknown; summary: unknown };
+      keys.push((await createIssue({ project, issuetype, summary })).key);
+    }
+  }
+  return keys;
+}
+
 export async function getProject(key: string): Promise<{ id: string; key: string; name: string; issueTypes?: { id: string; name: string; subtask?: boolean }[] }> {
   const res = await api.asApp().requestJira(route`/rest/api/3/project/${key}`);
   return json(res, `Reading project ${key}`);
