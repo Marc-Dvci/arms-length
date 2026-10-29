@@ -7,6 +7,19 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 export const SIGNATURE_HEADER = 'x-arms-length-signature';
 export const MAX_SKEW_SECONDS = 300;
 
+/** Hosts Forge serves web triggers from: `*.webtrigger.atlassian.app` today, `*.atlassian-dev.net` before. */
+const WEB_TRIGGER_HOST = /^[a-z0-9-]+\.(webtrigger\.atlassian\.app|hello\.atlassian-dev\.net)$/;
+
+/** Whether a pasted endpoint is a Forge web trigger URL, the only place the Bitbucket app sends snapshots. */
+export function isWebTriggerUrl(endpoint: string): boolean {
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === 'https:' && !u.username && !u.port && WEB_TRIGGER_HOST.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function newSecret(): string {
   return randomBytes(32).toString('hex');
 }

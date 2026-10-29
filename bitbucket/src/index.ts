@@ -2,6 +2,7 @@
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
 import { checkPullRequest, ping, type CheckResult, type Pairing } from './pullrequest';
+import { isWebTriggerUrl } from '../../src/core/signature';
 
 interface MergeCheckEvent {
   workspace: { uuid: string };
@@ -33,7 +34,7 @@ definitions.define('settings', async () => {
 definitions.define('pair', async ({ payload }) => {
   const endpoint = String(payload.endpoint ?? '').trim();
   const secret = String(payload.secret ?? '').trim();
-  if (!/^https:\/\/[^\s/]+\.(atlassian-dev\.net|atlassian\.net)\//.test(endpoint)) throw new Error('Paste the endpoint shown in the Arm\'s Length settings of your Jira site.');
+  if (!isWebTriggerUrl(endpoint)) throw new Error('Paste the endpoint shown in the Arm\'s Length settings of your Jira site.');
   if (!/^[0-9a-f]{64}$/.test(secret)) throw new Error('The pairing secret is 64 hexadecimal characters.');
   const test = await ping(endpoint, secret);
   if (!test.ok) throw new Error(`The Jira site refused the pairing (${test.status}). Check the endpoint and the secret.`);

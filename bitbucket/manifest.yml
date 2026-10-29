@@ -17,8 +17,8 @@ permissions:
   external:
     fetch:
       backend:
-        - address: '*.atlassian-dev.net'
-        - address: '*.atlassian.net'
+        - address: '*.webtrigger.atlassian.app'
+        - address: '*.hello.atlassian-dev.net'
 
 modules:
   bitbucket:mergeCheck:

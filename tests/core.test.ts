@@ -4,6 +4,7 @@ import { explain, gateMessage } from '../src/core/explain';
 import { allowedFromEvidence, checkDraft } from '../src/core/guard';
 import { runPopulationTest } from '../src/core/population';
 import { suggestReviewers, type ReviewRecord } from '../src/core/reviewers';
+import { isWebTriggerUrl } from '../src/core/signature';
 import { buildWorkpaper } from '../src/core/workpaper';
 import { buildDemoBank, DEMO_EXPECTED, DEMO_OPEN_ITEM, DEMO_PEOPLE, DEMO_QUARTER } from '../src/demo/bank';
 import { labelled } from './helpers';
@@ -170,5 +171,24 @@ describe('draft guard', () => {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const draft = `The pull request opened on ${d} ${months[m - 1]} ${y} at ${pr.createdAt.slice(11, 16)}.`;
     expect(checkDraft(draft, allowed).ok).toBe(true);
+  });
+});
+
+describe('pairing endpoint', () => {
+  it('accepts the web trigger hosts Forge serves', () => {
+    expect(isWebTriggerUrl('https://f3720f68-f071-4b5e-8aa8-e1d93ff30f71.webtrigger.atlassian.app/public/-iMVM0wfTh1EKiI0')).toBe(true);
+    expect(isWebTriggerUrl('https://abc.hello.atlassian-dev.net/x1/trigger')).toBe(true);
+  });
+
+  it('refuses any other host, scheme or credential', () => {
+    for (const url of [
+      'http://f3720f68.webtrigger.atlassian.app/public/x',
+      'https://evil.example.com/webtrigger.atlassian.app/x',
+      'https://webtrigger.atlassian.app.evil.example.com/x',
+      'https://user@f3720f68.webtrigger.atlassian.app/x',
+      'https://f3720f68.webtrigger.atlassian.app:8443/x',
+      'https://site.atlassian.net/rest/api/3/myself',
+      'not a url',
+    ]) expect(isWebTriggerUrl(url), url).toBe(false);
   });
 });
