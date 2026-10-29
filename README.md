@@ -1,6 +1,8 @@
 # Arm's Length: independent approval for agent-written code
 
-![tests](https://img.shields.io/badge/tests-123%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+![Arm's Length stops the release of a pull request whose only approval came from the person who directed the coding agent](docs/images/04-release-stopped.png)
+
+![tests](https://img.shields.io/badge/tests-126%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
@@ -41,6 +43,11 @@ The judge path needs one Jira site and no Bitbucket account.
    agent names Tom Becker, who reviewed 5 pull requests in `payments-core` in 90 days and is outside the chain.
 6. Click **Approve as me**. You are outside the chain, so the verdict turns PASS. **Merge and deploy** now ships it.
 7. Back on the population page, **Publish workpaper** writes the quarter's test to Confluence.
+8. To play the scene again, click **Reset the scene** in the settings.
+
+| The scene fails | An outside approval ships it | The quarter, tested |
+|---|---|---|
+| ![The issue panel names whose approval cannot count](docs/images/03-scene-fail.png) | ![PASS after an independent approval, merged and deployed](docs/images/06-approved-and-shipped.png) | ![The population test of 34 production deployments](docs/images/07-population-test.png) |
 
 With no Atlassian account at all: `npm ci && npm run demo` runs the same scene and population test on the
 same rule engine.
@@ -63,6 +70,8 @@ Arm's Length is for the engineer who approves a pull request an agent wrote, and
 internal auditor who tests change management at quarter end.
 
 ## How it works
+
+![MCP tools, a signed web trigger and Jira history feed one deterministic rule engine; its verdict lands in the panel, the validator, JQL, the gate and the population test; Rovo explains and drafts behind a guard](docs/images/09-architecture.png)
 
 ```mermaid
 flowchart LR
@@ -163,6 +172,8 @@ places that work on every plan: the Jira validator and the Pipelines step.
 
 ## Evidence
 
+![42 of 42 labelled and 16 of 16 held-out chains match; 290 injected-text runs change no verdict; the demo quarter's 34 deployments split 27, 6 and 1](docs/images/08-results.png)
+
 | What | Result | Reproduce |
 |---|---|---|
 | Labelled change chains, written before the rules ([`eval/cases`](eval/cases)) | 42 of 42 verdicts and primary rules match | `npm run eval` |
@@ -173,30 +184,35 @@ places that work on every plan: the Jira validator and the Pipelines step.
 | Removing the counted approvals from each PASS, or pushing a later commit | All turn FAIL (AL-2 for the push) | same |
 | Bitbucket snapshot to verdict to release gate, through the signed web trigger | FAIL, then PASS after an independent approval; unseen commits blocked | `npx vitest run tests/forge.test.ts` |
 | The shell gate's signature verified by the app's verifier | Accepted; wrong secret refused | `npx vitest run tests/gate.test.ts` |
+| Pairing endpoint pasted into the Bitbucket app | Only Forge web trigger hosts accepted, over HTTPS, without credentials or ports | `npx vitest run tests/core.test.ts` |
 | Demo quarter population test | 34 deployments: 27 PASS, 6 FAIL, 1 CANNOT DETERMINE, evidence-set hash stable across builds | `npm run demo` |
 
 The confusion matrices are in [`eval/reports/confusion.md`](eval/reports/confusion.md).
 
 ### Run live
 
-On a Jira and Confluence Standard developer site, 28 October 2026, app deployed to the development environment,
-signed in as a site admin outside the demo chains. Times are wall-clock in the browser.
+On a Jira and Confluence Standard developer site, signed in as a site admin outside the demo chains. Times are
+wall-clock in the browser. Rows dated 29 October 2026 ran on the production environment; the MCP rows ran on
+28 October 2026 on the development environment, whose tool names carry a `_development` suffix.
 
 | Step | Result |
 |---|---|
-| Load demo bank | 35 work items created, change chains stored, pull requests and deployments in Jira's development panel, 19.8 s |
-| Population test, demo quarter | 34 production deployments: 27 PASS, 6 FAIL, 1 CANNOT DETERMINE, 3 to 8 s |
-| JQL `armsLengthVerdict = FAIL` | 7 work items: the 6 failures of the quarter and the open scene |
-| **Merge and deploy** on the scene | Stopped in 2.9 s: "needs an approval from someone other than Léa Martin" |
-| Transition to Ready for release (validator) | Refused in 2.0 s with the same reason; a PASS work item went through |
-| **Approve as me**, then **Merge and deploy** | Verdict PASS, pull request merged, `prod-482` deployed, 1.3 s |
-| Raise exceptions as work items | 7 work items, 3.9 s |
-| Publish workpaper | Confluence page in the signed-in user's name, full width, 2.4 s |
-| MCP client (OAuth 2.1 with PKCE, Streamable HTTP) to `mcp.atlassian.com/forge/<appId>` | `initialize` 115 ms, `tools/list` 334 ms: the three tools |
-| `declare-agent-work` over MCP on a new work item | Recorded the signed-in developer's account as principal, 3.7 s |
-| `who-must-approve` over MCP on the scene | Léa Martin's approval does not count; proposes Tom Becker (5 reviews in `payments-core`), 2.4 s |
-| `change-evidence` over MCP on a work item with no pull request | CANNOT DETERMINE under AL-8, with the evidence hash, 2.7 s |
-| Docker, `--network none` | Image built in 66 s; the demo prints the same quarter and evidence-set hash |
+| Load demo bank (29 Oct) | 35 work items created, change chains stored, pull requests and deployments in Jira's development panel, 21.8 s |
+| Population test, demo quarter (29 Oct) | 34 production deployments: 27 PASS, 6 FAIL, 1 CANNOT DETERMINE, 4.2 s |
+| JQL `armsLengthVerdict = FAIL` (29 Oct) | 7 work items: the 6 failures of the quarter and the open scene |
+| **Merge and deploy** on the scene (29 Oct) | Stopped in 0.8 s: "needs an approval from someone other than Léa Martin" |
+| Transition to Ready for release, validator (29 Oct) | Refused in 2.4 s with the same reason |
+| **Approve as me**, then **Merge and deploy** (29 Oct) | Verdict PASS, pull request merged, `prod-482` deployed, 1.3 s |
+| Raise exceptions as work items (29 Oct) | 7 work items, 8.5 s |
+| Publish workpaper (29 Oct) | Confluence page in the signed-in user's name, full width, 2.9 s |
+| **Reset the scene** (29 Oct) | Pull request open again, verdict FAIL, deployment removed, 1.3 s |
+| MCP client (OAuth 2.1 with PKCE, Streamable HTTP) to `mcp.atlassian.com/forge/<appId>` (28 Oct) | `initialize` 115 ms, `tools/list` 334 ms: the three tools |
+| `declare-agent-work` over MCP on a new work item (28 Oct) | Recorded the signed-in developer's account as principal, 3.7 s |
+| `who-must-approve` over MCP on the scene (28 Oct) | Léa Martin's approval does not count; proposes Tom Becker (5 reviews in `payments-core`), 2.4 s |
+| `change-evidence` over MCP on a work item with no pull request (28 Oct) | CANNOT DETERMINE under AL-8, with the evidence hash, 2.7 s |
+| Docker, `--network none` (28 Oct) | Image built in 66 s; the demo prints the same quarter and evidence-set hash |
+
+![The verdict is an indexed issue property: armsLengthVerdict = FAIL in Jira search](docs/images/10-jql-verdict.png)
 
 **Real and synthetic.** The case sets and the demo bank are synthetic. The engine, the adapters and the Forge
 modules are the code that runs on a Jira site.
@@ -214,6 +230,8 @@ modules are the code that runs on a Jira site.
 | Every rule cites a regulation | [`src/core/rules.ts`](src/core/rules.ts) | `tests/evaluate.test.ts` "every rule carries at least one regulatory reference" |
 | Review history comes from the app's persisted Teamwork Graph query, page by page | [`src/forge/graph.ts`](src/forge/graph.ts) | `tests/graph.test.ts` "pages through the persisted query" |
 | The workpaper escapes markup | [`src/core/workpaper.ts`](src/core/workpaper.ts) | `tests/core.test.ts` "escapes markup in the workpaper" |
+| The Bitbucket app sends snapshots only to a Forge web trigger | [`src/core/signature.ts`](src/core/signature.ts) `isWebTriggerUrl`, [`bitbucket/manifest.yml`](bitbucket/manifest.yml) egress | `tests/core.test.ts` "pairing endpoint" |
+| The scene can be played again | [`src/forge/demo.ts`](src/forge/demo.ts) `resetDemoScene` | `tests/demo-flow.test.ts` "resets the scene after it shipped" |
 
 ## Quickstart
 
@@ -221,7 +239,7 @@ No credentials:
 
 ```
 npm ci
-npm test          # 123 tests
+npm test          # 126 tests
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline
