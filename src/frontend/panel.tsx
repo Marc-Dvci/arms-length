@@ -20,6 +20,12 @@ import { AGENT, approvalAppearance, approvalLabel, call, verdictAppearance, verd
 
 type View = PanelView & { demo: { isScene: boolean; canApprove: boolean; canShip: boolean }; shipMessage?: string; shipped?: boolean };
 
+/** The `who` resolver's answer: reviewers outside the change chain, from review history. */
+interface Who {
+  pullRequest: string | null;
+  suggestions: { ref: string; name: string; reviews: number; repo: string }[];
+}
+
 const stepStyle = xcss({ paddingBlock: 'space.050' });
 const muted = xcss({ color: 'color.text.subtlest' });
 
@@ -57,6 +63,8 @@ function App() {
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [rovoOn, setRovoOn] = useState(false);
+  const [who, setWho] = useState<Who | null>(null);
 
   const run = async (name: string, fn: string) => {
     setBusy(name);
@@ -72,7 +80,20 @@ function App() {
 
   useEffect(() => {
     run('load', 'panel');
+    rovo.isEnabled().then(setRovoOn, () => setRovoOn(false));
   }, []);
+
+  const askWho = async () => {
+    setBusy('who');
+    setError(null);
+    try {
+      setWho(await call<Who>('who'));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   if (!view) return error ? <SectionMessage appearance="error" title="Arm's Length could not load">{<Text>{error}</Text>}</SectionMessage> : <Spinner label="Rebuilding the change chain" />;
 
@@ -146,6 +167,18 @@ function App() {
         </Stack>
       ) : null}
 
+      {who && view.verdict !== 'PASS' ? (
+        <SectionMessage appearance="information" title="Who should approve">
+          <Stack space="space.050">
+            {who.suggestions.length ? (
+              who.suggestions.slice(0, 3).map((s) => <Text key={s.ref}>{`${s.name}: ${s.reviews} reviewed pull request${s.reviews === 1 ? '' : 's'} in ${s.repo}, outside the change chain.`}</Text>)
+            ) : (
+              <Text>No one outside the change chain has reviewed this repository in the review window. Any person outside the chain can approve.</Text>
+            )}
+          </Stack>
+        </SectionMessage>
+      ) : null}
+
       {view.shipMessage ? (
         <SectionMessage appearance={view.shipped ? 'success' : 'error'} title={view.shipped ? 'Merged and deployed' : 'Release pipeline stopped'}>
           <Text>{view.shipMessage}</Text>
@@ -158,9 +191,14 @@ function App() {
       ) : null}
 
       <ButtonGroup label="Actions">
-        {view.verdict !== 'PASS' ? (
+        {view.verdict !== 'PASS' && rovoOn ? (
           <Button appearance="primary" onClick={askRovo}>
             Ask Rovo who should approve
+          </Button>
+        ) : null}
+        {view.verdict !== 'PASS' && !rovoOn ? (
+          <Button appearance="primary" isDisabled={!!busy} onClick={askWho}>
+            {busy === 'who' ? 'Reading review history' : 'Who should approve?'}
           </Button>
         ) : null}
         {view.demo.canApprove ? (
