@@ -40,8 +40,9 @@ The judge path needs one Jira site and no Bitbucket account.
 4. Open the scene the settings page links to, "Check the IBAN country code against the beneficiary bank", and
    open **Arm's Length** from the work item's apps button. Its only approval comes from Léa Martin, who
    requested the change and assigned it to the Coding agent. The panel shows FAIL and names who cannot approve.
-5. Click **Merge and deploy**: the release pipeline check stops it. Click **Ask Rovo who should approve**: the
-   agent names Tom Becker, who reviewed 5 pull requests in `payments-core` in 90 days and is outside the chain.
+5. Click **Merge and deploy**: the release pipeline check stops it. Click **Who should approve?**: Tom Becker,
+   who reviewed 5 pull requests in `payments-core` in 90 days, is outside the chain. On a site with Rovo the button
+   reads **Ask Rovo who should approve** and opens the Arm's Length agent in Rovo chat.
 6. Click **Approve as me**. You are outside the chain, so the verdict turns PASS. **Merge and deploy** now ships it.
 7. Back on the population page, **Publish workpaper** writes the quarter's test to Confluence.
 8. To play the scene again, click **Reset the scene** in the settings.
@@ -203,6 +204,7 @@ wall-clock in the browser. Rows dated 29 October 2026 ran on the production envi
 | JQL `armsLengthVerdict = FAIL` (29 Oct) | 7 work items: the 6 failures of the quarter and the open scene |
 | **Merge and deploy** on the scene (29 Oct) | Stopped in 0.8 s: "needs an approval from someone other than Léa Martin" |
 | Transition to Ready for release, validator (29 Oct) | Refused in 2.4 s with the same reason |
+| **Who should approve?** on the scene (29 Oct) | Tom Becker (5 reviewed pull requests in `payments-core`), then Priya Raman (3), 0.9 s |
 | **Approve as me**, then **Merge and deploy** (29 Oct) | Verdict PASS, pull request merged, `prod-482` deployed, 1.3 s |
 | Raise exceptions as work items (29 Oct) | 7 work items, 8.5 s |
 | Publish workpaper (29 Oct) | Confluence page in the signed-in user's name, full width, 2.9 s |
@@ -233,6 +235,7 @@ modules are the code that runs on a Jira site.
 | The workpaper escapes markup | [`src/core/workpaper.ts`](src/core/workpaper.ts) | `tests/core.test.ts` "escapes markup in the workpaper" |
 | The Bitbucket app sends snapshots only to a Forge web trigger | [`src/core/signature.ts`](src/core/signature.ts) `isWebTriggerUrl`, [`bitbucket/manifest.yml`](bitbucket/manifest.yml) egress | `tests/core.test.ts` "pairing endpoint" |
 | The scene can be played again | [`src/forge/demo.ts`](src/forge/demo.ts) `resetDemoScene` | `tests/demo-flow.test.ts` "resets the scene after it shipped" |
+| Reviewer suggestions exclude everyone in the chain | [`src/core/reviewers.ts`](src/core/reviewers.ts), [`src/forge/services.ts`](src/forge/services.ts) `whoMustApprove` | `tests/demo-flow.test.ts` "loads 35 work items, then the judge approves and ships the scene" |
 
 ## Quickstart
 
