@@ -211,6 +211,7 @@ wall-clock in the browser. Rows dated 29 October 2026 ran on the production envi
 | **Reset the scene** (29 Oct) | Pull request open again, verdict FAIL, deployment removed, 1.3 s |
 | Bitbucket app paired with the Jira site (29 Oct) | Signed ping to the production web trigger accepted, 3.9 s |
 | A coding agent's pull request in Bitbucket, approved by the person who requested the work (29 Oct) | Merge check "Did not pass": "needs an approval from someone other than Marc Donovici (requested the change)"; the Jira panel shows the same FAIL, with the access-token bot as the agent |
+| A second person, outside the chain, approves the same pull request (29 Oct) | Check moves to CANNOT DETERMINE under AL-4: "nobody is on record as having directed coder-bot, so independence cannot be confirmed"; the release stays blocked until the agent's principal is declared |
 | MCP client (OAuth 2.1 with PKCE, Streamable HTTP) to `mcp.atlassian.com/forge/<appId>` (28 Oct) | `initialize` 115 ms, `tools/list` 334 ms: the three tools |
 | `declare-agent-work` over MCP on a new work item (28 Oct) | Recorded the signed-in developer's account as principal, 3.7 s |
 | `who-must-approve` over MCP on the scene (28 Oct) | Léa Martin's approval does not count; proposes Tom Becker (5 reviews in `payments-core`), 2.4 s |
