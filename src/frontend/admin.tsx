@@ -150,6 +150,9 @@ function App() {
                         Send development data again
                       </Button>
                     ) : null}
+                    <Button isDisabled={!!busy} onClick={() => act('reset', () => call('resetScene'), 'The scene is open again, approved only by the person who requested it.')}>
+                      Reset the scene
+                    </Button>
                     <Button appearance="warning" isDisabled={!!busy} onClick={() => act('remove', () => call('removeDemo'), 'Demo bank removed. The work items stay in the project.')}>
                       Remove demo data
                     </Button>

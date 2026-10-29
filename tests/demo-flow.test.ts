@@ -9,7 +9,7 @@ vi.mock('@forge/api', () => {
 });
 
 import { assessIssue } from '../src/forge/chain';
-import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank, resendDevInfo } from '../src/forge/demo';
+import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank, resendDevInfo, resetDemoScene } from '../src/forge/demo';
 import { listSpaces, populationTest, publishWorkpaper, whoMustApprove } from '../src/forge/services';
 import { getDemoIndex } from '../src/forge/store';
 import { handler } from '../src/forge/resolvers';
@@ -61,6 +61,22 @@ describe('demo bank on a site', () => {
     const shipped = await demoShip(scene, JUDGE);
     expect(shipped.shipped).toBe(true);
     expect((await assessIssue(scene)).verdict.deployments).toHaveLength(1);
+  });
+
+  it('resets the scene after it shipped, so it can be played again', async () => {
+    await loadDemoBank('PAY', JUDGE);
+    const scene = (await demoSceneKey())!;
+    await demoApprove(scene, JUDGE);
+    expect((await demoShip(scene, JUDGE)).shipped).toBe(true);
+
+    expect(await resetDemoScene()).toBe(scene);
+    const again = await assessIssue(scene);
+    expect(again.verdict.verdict).toBe('FAIL');
+    expect(again.verdict.deployments).toHaveLength(0);
+    expect(again.chain.pullRequests[0]).toMatchObject({ state: 'OPEN' });
+    expect(again.chain.pullRequests[0].reviews.map((r) => again.chain.people[r.by].name)).toEqual(['Léa Martin']);
+    expect(site.devops.some((d) => (d as { p: string }).p.match(/^\/rest\/deployments\/0\.1\/pipelines\/payments-release\/environments\/production\/deployments\/\d+$/))).toBe(true);
+    expect((await demoShip(scene, JUDGE)).shipped).toBe(false);
   });
 
   it('stops offering "Approve as me" once the caller approved the head commit', async () => {

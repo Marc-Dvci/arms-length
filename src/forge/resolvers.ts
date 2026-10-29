@@ -4,7 +4,7 @@ import { newSecret } from '../core/signature';
 import { verdictLabel, panelView } from '../core/viewmodel';
 import { RULES } from '../core/rules';
 import { assessIssue } from './chain';
-import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank, resendDevInfo } from './demo';
+import { demoApprove, demoSceneKey, demoShip, loadDemoBank, removeDemoBank, resendDevInfo, resetDemoScene } from './demo';
 import { getUser, listProjects } from './jira';
 import { defaultPeriod, listSpaces, populationTest, publishWorkpaper, raiseExceptions, whoMustApprove } from './services';
 import { getConfig, getDemoIndex, getList, kvs, K, setConfig, type AppConfig } from './store';
@@ -113,6 +113,8 @@ resolver.define('pair', async () => {
 resolver.define('loadDemo', async ({ payload, context }) => loadDemoBank(payload.projectKey, callerOf(context as Ctx)));
 
 resolver.define('resendDevInfo', async () => resendDevInfo());
+
+resolver.define('resetScene', async () => ({ key: await resetDemoScene() }));
 
 resolver.define('removeDemo', async () => {
   await removeDemoBank();

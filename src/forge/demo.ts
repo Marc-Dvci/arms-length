@@ -3,7 +3,7 @@ import { gateMessage } from '../core/explain';
 import type { ChangeChain, Ref } from '../core/types';
 import { buildDemoBank, DEMO_OPEN_ITEM, DEMO_ROLES } from '../demo/bank';
 import { assessIssue } from './chain';
-import { createIssues, deleteDevOpsByProperty, getProject, getUser, postDevOps } from './jira';
+import { createIssues, deleteDeployment, deleteDevOpsByProperty, getProject, getUser, postDevOps } from './jira';
 import { getDemoChain, getDemoIndex, kvs, K, listByPrefix, type DemoIndex } from './store';
 
 const REPO_URL = 'https://github.com/Marc-Dvci/arms-length';
@@ -147,6 +147,26 @@ export async function removeDemoBank(): Promise<void> {
 /** The work item created for PAY-482, the open pull request a judge can approve. */
 export async function demoSceneKey(): Promise<string | null> {
   return (await getDemoIndex())?.keys[DEMO_OPEN_ITEM] ?? null;
+}
+
+/**
+ * Puts the scene back as it was loaded: the pull request open, approved only by the person who requested the
+ * change, and no deployment. Lets the scene be played again after "Approve as me" and "Merge and deploy".
+ */
+export async function resetDemoScene(): Promise<string | null> {
+  const index = await getDemoIndex();
+  const key = index?.keys[DEMO_OPEN_ITEM];
+  if (!index || !key) return null;
+  const loaded = rekey(buildDemoBank().find((c) => c.workItem.key === DEMO_OPEN_ITEM)!, index.keys);
+  const current = await getDemoChain(key);
+  for (const [i, d] of (current?.deployments ?? []).entries()) {
+    if (loaded.deployments.some((x) => x.id === d.id)) continue;
+    await deleteDeployment(d.pipeline ?? 'payments-release', d.env, Number(d.id.replace(/\D/g, '')) * 10 + i).catch(() => undefined);
+  }
+  await kvs.set(K.demoChain(key), loaded);
+  await pushDevInfo([loaded], {}).catch(() => undefined);
+  await assessIssue(key);
+  return key;
 }
 
 async function update(key: string, change: (c: ChangeChain) => void) {

@@ -28,7 +28,9 @@ Confluence is optional. Without it, everything works except **Publish workpaper*
 reachable from **Open the settings** on the empty population page). Tab **Get started**: choose a project and
 click **Load demo bank**. It creates 35 work items labelled
 `arms-length-demo`, stores their synthetic change chains, and sends their pull requests and deployments to
-Jira's development panel. **Remove demo data** deletes the chains and the development data; the work items stay.
+Jira's development panel. **Reset the scene** puts the open pull request back as it was loaded, so the scene
+can be played again after **Approve as me** and **Merge and deploy**. **Remove demo data** deletes the chains and
+the development data; the work items stay.
 
 ## 3. Run the population test
 

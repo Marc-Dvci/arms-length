@@ -23,9 +23,16 @@ type View = PanelView & { demo: { isScene: boolean; canApprove: boolean; canShip
 const stepStyle = xcss({ paddingBlock: 'space.050' });
 const muted = xcss({ color: 'color.text.subtlest' });
 
+/** Text inside its own box: Jira's page style pushes a paragraph that follows another one down a line. */
+const Item = (props: React.ComponentProps<typeof Text>) => (
+  <Box>
+    <Text {...props} />
+  </Box>
+);
+
 function Who({ p }: { p: PersonView }) {
   if (p.account && !p.agent) return <User accountId={p.ref} />;
-  return p.agent ? <Lozenge appearance="new">{p.name}</Lozenge> : <Text>{p.name}</Text>;
+  return p.agent ? <Lozenge appearance="new">{p.name}</Lozenge> : <Item>{p.name}</Item>;
 }
 
 function Chain({ view }: { view: View }) {
@@ -34,11 +41,11 @@ function Chain({ view }: { view: View }) {
       {view.chain.map((s) => (
         <Box key={s.step} xcss={stepStyle}>
           <Inline space="space.100" alignBlock="center" shouldWrap>
-            <Text weight="bold">{s.step}</Text>
+            <Item weight="bold">{s.step}</Item>
             {s.people.map((p) => (
               <Who key={p.ref} p={p} />
             ))}
-            {s.note ? <Text color="color.text.subtle">{s.note}</Text> : null}
+            {s.note ? <Item color="color.text.subtle">{s.note}</Item> : null}
           </Inline>
         </Box>
       ))}
@@ -119,7 +126,7 @@ function App() {
               {pr.mustNotApprove.map((m) => (
                 <Inline key={m.person.ref} space="space.100" alignBlock="center" shouldWrap>
                   <Who p={m.person} />
-                  <Text color="color.text.subtle">{m.why}</Text>
+                  <Item color="color.text.subtle">{m.why}</Item>
                 </Inline>
               ))}
             </Stack>

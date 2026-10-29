@@ -127,6 +127,11 @@ export async function postDevOps(path: 'devinfo' | 'deployments', body: unknown)
   return json(res, `Sending ${path} data`);
 }
 
+/** Deletes one deployment from Jira's deployment information. */
+export async function deleteDeployment(pipelineId: string, environmentId: string, sequence: number): Promise<void> {
+  await api.asApp().requestJira(route`/rest/deployments/0.1/pipelines/${pipelineId}/environments/${environmentId}/deployments/${String(sequence)}`, { method: 'DELETE' });
+}
+
 export async function deleteDevOpsByProperty(property: string, value: string): Promise<void> {
   await api.asApp().requestJira(route`/rest/devinfo/0.10/bulkByProperties?${property}=${value}`, { method: 'DELETE' });
   await api.asApp().requestJira(route`/rest/deployments/0.1/bulkByProperties?${property}=${value}`, { method: 'DELETE' });
