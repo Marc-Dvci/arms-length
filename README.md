@@ -20,7 +20,7 @@ I test change-management controls in IT audits at a bank's technology practice.
 
 | Criterion | Where to look |
 |---|---|
-| Technological implementation | [`manifest.yml`](manifest.yml) and [`bitbucket/manifest.yml`](bitbucket/manifest.yml) (20 modules across Jira, Bitbucket, Rovo and MCP, plus the Confluence and Teamwork Graph APIs), [`src/forge/`](src/forge), [`tests/forge.test.ts`](tests/forge.test.ts) |
+| Technological implementation | [`manifest.yml`](manifest.yml) and [`bitbucket/manifest.yml`](bitbucket/manifest.yml) (21 modules across Jira, Bitbucket, Rovo and MCP, plus the Confluence and Teamwork Graph APIs), [`src/forge/`](src/forge), [`tests/forge.test.ts`](tests/forge.test.ts) |
 | Design | [The issue panel](src/frontend/panel.tsx), [the population test](src/frontend/population.tsx), [the settings](src/frontend/admin.tsx), [the judge path](#see-it-work) |
 | Potential impact | [The problem](#the-problem), [the rule table](src/core/rules.ts) with its regulatory references |
 | Innovation | [The MCP caller's identity is the evidence](#the-mcp-call-is-the-evidence) |

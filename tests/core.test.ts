@@ -176,7 +176,7 @@ describe('draft guard', () => {
 
 describe('pairing endpoint', () => {
   it('accepts the web trigger hosts Forge serves', () => {
-    expect(isWebTriggerUrl('https://f3720f68-f071-4b5e-8aa8-e1d93ff30f71.webtrigger.atlassian.app/public/-iMVM0wfTh1EKiI0')).toBe(true);
+    expect(isWebTriggerUrl('https://0b6a1c2e-5d4f-4e21-9a7c-3f2b8d1e6a90.webtrigger.atlassian.app/public/-Xy12AbCdEfGh')).toBe(true);
     expect(isWebTriggerUrl('https://abc.hello.atlassian-dev.net/x1/trigger')).toBe(true);
   });
 
