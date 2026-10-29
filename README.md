@@ -2,7 +2,7 @@
 
 ![Arm's Length stops the release of a pull request whose only approval came from the person who directed the coding agent](docs/images/04-release-stopped.png)
 
-![tests](https://img.shields.io/badge/tests-126%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+![tests](https://img.shields.io/badge/tests-129%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
@@ -209,6 +209,8 @@ wall-clock in the browser. Rows dated 29 October 2026 ran on the production envi
 | Raise exceptions as work items (29 Oct) | 7 work items, 8.5 s |
 | Publish workpaper (29 Oct) | Confluence page in the signed-in user's name, full width, 2.9 s |
 | **Reset the scene** (29 Oct) | Pull request open again, verdict FAIL, deployment removed, 1.3 s |
+| Bitbucket app paired with the Jira site (29 Oct) | Signed ping to the production web trigger accepted, 3.9 s |
+| A coding agent's pull request in Bitbucket, approved by the person who requested the work (29 Oct) | Merge check "Did not pass": "needs an approval from someone other than Marc Donovici (requested the change)"; the Jira panel shows the same FAIL, with the access-token bot as the agent |
 | MCP client (OAuth 2.1 with PKCE, Streamable HTTP) to `mcp.atlassian.com/forge/<appId>` (28 Oct) | `initialize` 115 ms, `tools/list` 334 ms: the three tools |
 | `declare-agent-work` over MCP on a new work item (28 Oct) | Recorded the signed-in developer's account as principal, 3.7 s |
 | `who-must-approve` over MCP on the scene (28 Oct) | Léa Martin's approval does not count; proposes Tom Becker (5 reviews in `payments-core`), 2.4 s |
@@ -234,6 +236,8 @@ modules are the code that runs on a Jira site.
 | Review history comes from the app's persisted Teamwork Graph query, page by page | [`src/forge/graph.ts`](src/forge/graph.ts) | `tests/graph.test.ts` "pages through the persisted query" |
 | The workpaper escapes markup | [`src/core/workpaper.ts`](src/core/workpaper.ts) | `tests/core.test.ts` "escapes markup in the workpaper" |
 | The Bitbucket app sends snapshots only to a Forge web trigger | [`src/core/signature.ts`](src/core/signature.ts) `isWebTriggerUrl`, [`bitbucket/manifest.yml`](bitbucket/manifest.yml) egress | `tests/core.test.ts` "pairing endpoint" |
+| A Bitbucket app user (an access-token bot) counts as an agent | [`src/forge/chain.ts`](src/forge/chain.ts) `person` | `tests/forge.test.ts` "counts a Bitbucket app user" |
+| Storage keys survive Bitbucket's braced UUIDs and unmapped commit authors | [`src/adapters/bitbucket.ts`](src/adapters/bitbucket.ts) `verdictKey`, [`src/forge/chain.ts`](src/forge/chain.ts) | `tests/forge.test.ts` "stores Bitbucket verdicts under keys Forge storage accepts", "accepts commit authors Bitbucket could not map" |
 | The scene can be played again | [`src/forge/demo.ts`](src/forge/demo.ts) `resetDemoScene` | `tests/demo-flow.test.ts` "resets the scene after it shipped" |
 | Reviewer suggestions exclude everyone in the chain | [`src/core/reviewers.ts`](src/core/reviewers.ts), [`src/forge/services.ts`](src/forge/services.ts) `whoMustApprove` | `tests/demo-flow.test.ts` "loads 35 work items, then the judge approves and ships the scene" |
 
@@ -243,7 +247,7 @@ No credentials:
 
 ```
 npm ci
-npm test          # 126 tests
+npm test          # 129 tests
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline
