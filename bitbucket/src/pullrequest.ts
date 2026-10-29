@@ -1,6 +1,6 @@
 import api, { assumeTrustedRoute, fetch, route } from '@forge/api';
 import { kvs } from '@forge/kvs';
-import { snapshotFromBitbucket, type BbActivity, type BbCommit, type BbPullRequest } from '../../src/adapters/bitbucket';
+import { snapshotFromBitbucket, verdictKey, type BbActivity, type BbCommit, type BbPullRequest } from '../../src/adapters/bitbucket';
 import { SIGNATURE_HEADER, sign } from '../../src/core/signature';
 
 export interface Pairing {
@@ -66,7 +66,7 @@ export async function checkPullRequest(workspace: string, repository: string, id
   const out = (await res.json()) as Omit<CheckResult, 'checkedAt'>;
   const result = { ...out, checkedAt };
   await kvs.set(`verdict:${snapshot.pullRequest.id}`, result);
-  await kvs.set(`verdict-by-id:${repository}:${id}`, result);
+  await kvs.set(verdictKey(repository, id), result);
   return result;
 }
 

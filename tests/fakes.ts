@@ -6,12 +6,19 @@ import type { JiraChangelogEntry, JiraIssue, JiraUserRef } from '../src/adapters
 
 export const memory = { store: new Map<string, unknown>(), secrets: new Map<string, unknown>() };
 
+/** Forge KVS rejects any other key with INVALID_KEY (seen live with Bitbucket's braced UUIDs). */
+const KVS_KEY = /^(?!\s+$)[a-zA-Z0-9:._\s\-#]+$/;
+const key = (k: string) => {
+  if (!KVS_KEY.test(k)) throw new Error(`INVALID_KEY: ${k}`);
+  return k;
+};
+
 export const fakeKvs = {
-  get: async (k: string) => structuredClone(memory.store.get(k)),
-  set: async (k: string, v: unknown) => void memory.store.set(k, structuredClone(v)),
-  delete: async (k: string) => void memory.store.delete(k),
-  getSecret: async (k: string) => memory.secrets.get(k),
-  setSecret: async (k: string, v: unknown) => void memory.secrets.set(k, v),
+  get: async (k: string) => structuredClone(memory.store.get(key(k))),
+  set: async (k: string, v: unknown) => void memory.store.set(key(k), structuredClone(v)),
+  delete: async (k: string) => void memory.store.delete(key(k)),
+  getSecret: async (k: string) => memory.secrets.get(key(k)),
+  setSecret: async (k: string, v: unknown) => void memory.secrets.set(key(k), v),
   query: () => {
     let prefix = '';
     const q = {

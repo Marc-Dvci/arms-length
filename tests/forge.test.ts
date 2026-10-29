@@ -15,7 +15,7 @@ vi.mock('@forge/api', () => {
   return { default: { asApp, asUser }, route: fakeRoute, webTrigger: { getUrl: async () => 'https://abc.hello.atlassian-dev.net/x1/trigger' } };
 });
 
-import { snapshotFromBitbucket, type BbActivity, type BbCommit, type BbPullRequest } from '../src/adapters/bitbucket';
+import { snapshotFromBitbucket, verdictKey, type BbActivity, type BbCommit, type BbPullRequest } from '../src/adapters/bitbucket';
 import { SIGNATURE_HEADER, sign } from '../src/core/signature';
 import { declareAgentWorkAction, managementResponseAction, whoMustApproveAction } from '../src/forge/actions';
 import { assessIssue } from '../src/forge/chain';
@@ -108,6 +108,33 @@ describe('web trigger', () => {
     expect(second.verdict).toBe('PASS');
     expect(second.message).toContain('independent approval by Tom Becker');
     expect((site.properties['PAY-7/arms-length'] as { verdict: string }).verdict).toBe('PASS');
+  });
+
+  it('accepts commit authors Bitbucket could not map to an account', async () => {
+    const snap = bitbucketPr([LEA]);
+    snap.pullRequest.commits[0].author = 'raw:dev <dev@example.com>';
+    snap.people['raw:dev <dev@example.com>'] = { name: 'dev <dev@example.com>' };
+    const res = await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: snap });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body!).verdict).toBe('FAIL');
+  });
+
+  it('counts a Bitbucket app user, such as an access-token bot, as an agent', async () => {
+    const BOT_APP = '712020:access-token-bot';
+    const snap = bitbucketPr([LEA]);
+    snap.pullRequest.author = BOT_APP;
+    snap.pullRequest.commits.forEach((c) => (c.author = BOT_APP));
+    snap.people[BOT_APP] = { name: 'coder-bot', type: 'app_user' };
+    const out = JSON.parse((await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: snap })).body!);
+    expect(out.verdict).toBe('FAIL');
+    const a = await assessIssue('PAY-7');
+    expect(a.chain.people[BOT_APP]).toMatchObject({ name: 'coder-bot', kind: 'agent' });
+  });
+
+  it('stores Bitbucket verdicts under keys Forge storage accepts', async () => {
+    const k = verdictKey('{38212b29-c2a8-457c-b32f-31109fdec081}', 1);
+    expect(k).toBe('verdict-by-id:38212b29-c2a8-457c-b32f-31109fdec081:1');
+    await expect(fakeKvs.set(k, { verdict: 'FAIL' })).resolves.toBeUndefined();
   });
 
   it('treats an approval given before a later push as stale', async () => {

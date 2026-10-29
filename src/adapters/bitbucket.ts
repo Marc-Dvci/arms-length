@@ -43,6 +43,9 @@ export interface BbPerson {
   type?: string;
 }
 
+/** Storage key of a pull request's last verdict. Forge storage keys cannot hold the braces of Bitbucket UUIDs. */
+export const verdictKey = (repositoryUuid: string, id: number | string) => `verdict-by-id:${repositoryUuid.replace(/[{}]/g, '')}:${id}`;
+
 /** Atlassian account ID when Bitbucket gives one, so the reference matches Jira's. */
 export function refOf(a: BbAccount | undefined | null): Ref {
   if (!a) return 'bb:unknown';

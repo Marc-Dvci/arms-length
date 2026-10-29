@@ -14,13 +14,18 @@ export interface Assessed {
 
 async function person(ref: Ref, config: AppConfig, hints: Record<Ref, { name: string; type?: string }>): Promise<Person | null> {
   const override = config.identities[ref];
-  const cached = (await kvs.get<Person>(K.person(ref))) as Person | undefined;
+  // Unmapped commit authors (raw:) and Bitbucket-only accounts (bb:{uuid}) are not Atlassian accounts, and their
+  // characters are not allowed in storage keys.
+  const account = !ref.startsWith('raw:') && !ref.startsWith('bb:');
+  const cached = account ? ((await kvs.get<Person>(K.person(ref))) as Person | undefined) : undefined;
   if (override) return { name: cached?.name ?? hints[ref]?.name ?? ref, kind: override.kind, ...(override.actsAs ? { actsAs: override.actsAs } : {}) };
   if (cached) return cached;
-  if (ref.startsWith('raw:') || ref.startsWith('bb:')) return null;
+  // Bitbucket app users (access-token bots, apps) act for an agent even when Jira does not know them.
+  const appUser = hints[ref]?.type === 'app_user' ? ({ name: hints[ref].name, kind: 'agent' } as Person) : null;
+  if (!account) return appUser;
   const user = await getUser(ref);
-  if (!user) return null;
-  const p: Person = { name: user.displayName ?? hints[ref]?.name ?? ref, kind: kindFromAccountType(user.accountType) };
+  if (!user) return appUser;
+  const p: Person = { name: user.displayName ?? hints[ref]?.name ?? ref, kind: appUser ? 'agent' : kindFromAccountType(user.accountType) };
   await kvs.set(K.person(ref), p);
   return p;
 }

@@ -2,6 +2,7 @@
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
 import { checkPullRequest, ping, type CheckResult, type Pairing } from './pullrequest';
+import { verdictKey } from '../../src/adapters/bitbucket';
 import { isWebTriggerUrl } from '../../src/core/signature';
 
 interface MergeCheckEvent {
@@ -48,7 +49,7 @@ definitions.define('card', async ({ context }) => {
   const repo = ctx.extension?.repository?.uuid;
   const id = ctx.extension?.pullRequest?.id;
   if (!repo || id === undefined) throw new Error('No pull request in context.');
-  return ((await kvs.get<CheckResult>(`verdict-by-id:${repo}:${id}`)) as CheckResult | undefined) ?? null;
+  return ((await kvs.get<CheckResult>(verdictKey(repo, id))) as CheckResult | undefined) ?? null;
 });
 
 definitions.define('recheck', async ({ context }) => {
