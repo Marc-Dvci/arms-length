@@ -4,7 +4,15 @@
  */
 import type { JiraChangelogEntry, JiraIssue, JiraUserRef } from '../src/adapters/jira';
 
-export const memory = { store: new Map<string, unknown>(), secrets: new Map<string, unknown>() };
+export const memory = { store: new Map<string, unknown>(), secrets: new Map<string, unknown>(), entities: new Map<string, unknown>() };
+export const fakeConditions = { notExists: () => ({ kind: 'missing' }), equalTo: (value: unknown) => ({ kind: 'equal', value }) };
+export class FakeFilter<T = unknown> {
+  rules: { field: keyof T; condition: { kind: string; value?: unknown } }[] = [];
+  and(field: keyof T, condition: { kind: string; value?: unknown }) {
+    this.rules.push({ field, condition });
+    return this;
+  }
+}
 
 /** Forge KVS rejects any other key with INVALID_KEY (seen live with Bitbucket's braced UUIDs). */
 const KVS_KEY = /^(?!\s+$)[a-zA-Z0-9:._\s\-#]+$/;
@@ -14,6 +22,28 @@ const key = (k: string) => {
 };
 
 export const fakeKvs = {
+  entity: <T>(name: string) => ({ get: async (k: string) => structuredClone(memory.entities.get(`${name}:${key(k)}`)) as T | undefined }),
+  transact: () => {
+    const writes: { k: string; value: unknown; entity?: { entityName: string; conditions?: FakeFilter<any> } }[] = [];
+    const transaction = {
+      set: (k: string, value: unknown, entity?: { entityName: string; conditions?: FakeFilter<any> }) => {
+        writes.push({ k: key(k), value: structuredClone(value), entity });
+        return transaction;
+      },
+      execute: async () => {
+        for (const w of writes)
+          if (w.entity?.conditions) {
+            const current = memory.entities.get(`${w.entity.entityName}:${w.k}`) as Record<string, unknown> | undefined;
+            for (const { field, condition } of w.entity.conditions.rules) {
+              const value = current?.[field as string];
+              if (condition.kind === 'missing' ? value !== undefined : value !== condition.value) throw new Error('CONDITION_FAILED');
+            }
+          }
+        for (const w of writes) (w.entity ? memory.entities : memory.store).set(w.entity ? `${w.entity.entityName}:${w.k}` : w.k, structuredClone(w.value));
+      },
+    };
+    return transaction;
+  },
   get: async (k: string) => structuredClone(memory.store.get(key(k))),
   set: async (k: string, v: unknown) => void memory.store.set(key(k), structuredClone(v)),
   delete: async (k: string) => void memory.store.delete(key(k)),
@@ -45,18 +75,69 @@ export interface FakeSite {
   confluenceTitles: Set<string>;
   failChangelog: Set<string>;
   rejectLabels: boolean;
+  createStatus?: number;
+  denied: Set<string>;
+  permissions: Record<string, boolean>;
 }
 
-export const site: FakeSite = { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], confluence: [], confluenceTitles: new Set(), failChangelog: new Set(), rejectLabels: false };
+export const site: FakeSite = {
+  issues: {},
+  changelogs: {},
+  users: {},
+  properties: {},
+  comments: {},
+  created: [],
+  devops: [],
+  confluence: [],
+  confluenceTitles: new Set(),
+  failChangelog: new Set(),
+  rejectLabels: false,
+  denied: new Set(),
+  permissions: {},
+};
 
 export function resetSite() {
   memory.store.clear();
   memory.secrets.clear();
-  Object.assign(site, { issues: {}, changelogs: {}, users: {}, properties: {}, comments: {}, created: [], devops: [], confluence: [], confluenceTitles: new Set(), failChangelog: new Set(), rejectLabels: false });
+  memory.entities.clear();
+  Object.assign(site, {
+    issues: {},
+    changelogs: {},
+    users: {},
+    properties: {},
+    comments: {},
+    created: [],
+    devops: [],
+    confluence: [],
+    confluenceTitles: new Set(),
+    failChangelog: new Set(),
+    rejectLabels: false,
+    createStatus: undefined,
+    denied: new Set(),
+    permissions: {},
+  });
 }
 
 const ok = (body: unknown, status = 200) =>
-  ({ ok: status < 300, status, statusText: 'OK', json: async () => body, text: async () => JSON.stringify(body), headers: new Headers() }) as unknown as Response;
+  ({
+    ok: status < 300,
+    status,
+    statusText: 'OK',
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+    headers: new Headers(),
+  }) as unknown as Response;
+
+export async function fakeRequestAsUser(path: string, init?: RequestInit): Promise<Response> {
+  const url = new URL(path, 'https://site.atlassian.net');
+  if (url.pathname === '/rest/api/3/mypermissions') {
+    const name = url.searchParams.get('permissions')!;
+    return ok({ permissions: { [name]: { havePermission: site.permissions[name] !== false } } });
+  }
+  const issue = url.pathname.match(/^\/rest\/api\/3\/issue\/([^/]+)/)?.[1];
+  if (issue && site.denied.has(decodeURIComponent(issue))) return ok({}, 403);
+  return fakeRequestJira(path, init);
+}
 
 export async function fakeRequestJira(path: string, init?: RequestInit): Promise<Response> {
   const url = new URL(path, 'https://site.atlassian.net');
@@ -88,14 +169,27 @@ export async function fakeRequestJira(path: string, init?: RequestInit): Promise
     body.issueUpdates.forEach((u, i) => {
       if (site.rejectLabels && u.fields.labels) return errors.push({ failedElementNumber: i });
       site.created.push({ fields: u.fields });
-      issues.push({ key: `PAY-${site.created.length}` });
+      const createdKey = `PAY-${site.created.length}`;
+      issues.push({ key: createdKey });
+      site.issues[createdKey] = { id: String(1000 + site.created.length), key: createdKey, fields: { created: '2026-10-28T08:00:00Z', ...u.fields } };
     });
     return ok({ issues, errors }, 201);
   }
   if (p === '/rest/api/3/issue' && method === 'POST') {
+    if (site.createStatus) return ok({ errorMessages: ['Create rejected'] }, site.createStatus);
     const body = JSON.parse(String(init?.body));
     site.created.push(body);
     return ok({ id: String(1000 + site.created.length), key: `OPS-${site.created.length}` }, 201);
+  }
+  if (p === '/rest/api/3/search/jql') {
+    const jql = url.searchParams.get('jql') ?? '';
+    const label = jql.match(/labels = "([^"]+)"/)?.[1];
+    const project = jql.match(/project = ([A-Z][A-Z0-9_]*)/)?.[1];
+    const issues = site.created.flatMap((item, index) => {
+      const fields = item.fields as { labels?: string[]; project?: { key?: string } };
+      return label && fields?.labels?.includes(label) && fields.project?.key === project ? [{ key: `OPS-${index + 1}` }] : [];
+    });
+    return ok({ issues });
   }
   if ((m = p.match(/^\/rest\/api\/3\/issue\/([^/]+)$/))) {
     const issue = site.issues[decodeURIComponent(m[1])];
@@ -126,16 +220,19 @@ export async function fakeRequestConfluence(path: string, init?: RequestInit): P
   site.confluence.push({ method, path: url.pathname, body });
   const reply = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
   if (url.pathname === '/wiki/api/v2/spaces') {
-    return reply({ results: [
-      { id: '9', key: '~7120200a', name: 'Marc Donovici', type: 'personal' },
-      { id: '7', key: 'SD', name: 'Software development', type: 'onboarding' },
-    ] });
+    return reply({
+      results: [
+        { id: '9', key: '~7120200a', name: 'Marc Donovici', type: 'personal' },
+        { id: '7', key: 'SD', name: 'Software development', type: 'onboarding' },
+      ],
+    });
   }
   if (url.pathname === '/wiki/api/v2/pages' && method === 'POST') {
     if (site.confluenceTitles.has(body.title)) return reply({ errors: [{ title: 'A page with this title already exists' }] }, 400);
     site.confluenceTitles.add(body.title);
   }
-  if (url.pathname === '/wiki/api/v2/pages' && method === 'POST') return reply({ id: '622595', _links: { base: 'https://site.atlassian.net/wiki', webui: '/spaces/SD/pages/622595' } });
+  if (url.pathname === '/wiki/api/v2/pages' && method === 'POST')
+    return reply({ id: '622595', _links: { base: 'https://site.atlassian.net/wiki', webui: '/spaces/SD/pages/622595' } });
   if (/^\/wiki\/api\/v2\/pages\/\d+\/properties$/.test(url.pathname) && method === 'POST') return reply({ id: '1', key: body.key, value: body.value });
   return reply({ message: `unhandled ${method} ${url.pathname}` }, 404);
 }

@@ -1,4 +1,6 @@
 import api, { route } from '@forge/api';
+import { randomUUID } from 'node:crypto';
+import { sha256 } from '../core/evidence';
 import { describeRoles, nameOf } from '../core/explain';
 import { allowedFromEvidence, checkDraft, type GuardResult } from '../core/guard';
 import { runPopulationTest, type PopulationResult } from '../core/population';
@@ -8,8 +10,41 @@ import type { ChangeChain, Ref } from '../core/types';
 import { buildWorkpaper } from '../core/workpaper';
 import { assessIssue, liveChain, type Assessed } from './chain';
 import { reviewsFromGraph } from './graph';
-import { addComment, createIssue, getIssue, getProject, getUser, siteUrl } from './jira';
-import { appendUnique, getConfig, getDemoIndex, getList, K, listByPrefix } from './store';
+import { visible } from './access';
+import { addComment, createIssue, getIssue, getProject, getUser, JiraError, siteUrl } from './jira';
+import { appendUnique, getConfig, getDemoIndex, getList, K, listByPrefix, updateValue } from './store';
+
+/** Claim before creating remotely. A lost response is recovered by an app-owned Jira label, never by creating twice. */
+async function createExceptionOnce(id: string, projectKey: string, fields: Record<string, unknown>): Promise<string> {
+  type Claim = { token: string; key?: string; retryable?: boolean };
+  const marker = sha256(`${projectKey}:${id}`);
+  const label = `arms-length-${marker.slice(0, 24)}`;
+  const token = randomUUID();
+  const claim = await updateValue<Claim>(`exception:${marker}`, (current) => (!current || current.retryable ? { token } : current));
+  if (claim.key) return claim.key;
+  if (claim.token !== token) {
+    const jql = `project = ${projectKey} AND labels = "${label}"`;
+    const response = await api.asUser().requestJira(route`/rest/api/3/search/jql?jql=${jql}&fields=key&maxResults=2`);
+    if (!response.ok) throw new Error('The earlier exception creation could not be checked. Retry when Jira is available.');
+    const matches = (await response.json()) as { issues?: { key: string }[] };
+    if (matches.issues?.length !== 1)
+      throw new Error(`Exception creation is in progress or awaiting recovery. Retry after Jira has indexed label ${label}; no duplicate was created.`);
+    const key = matches.issues[0].key;
+    await updateValue<Claim>(`exception:${marker}`, (current) => ({ ...current!, key }));
+    return key;
+  }
+  let created: { id: string; key: string };
+  try {
+    created = await createIssue({ ...fields, labels: [...((fields.labels as string[]) ?? []), label] }, true);
+  } catch (error) {
+    // Explicit rejection did not create an issue. Timeouts and server errors retain the recovery claim.
+    if (error instanceof JiraError && [400, 401, 403, 404, 405, 413, 422, 429].includes(error.status))
+      await updateValue<Claim>(`exception:${marker}`, (current) => (current?.token === token ? { token, retryable: true } : current!));
+    throw error;
+  }
+  await updateValue<Claim>(`exception:${marker}`, (current) => ({ ...current!, key: created.key }));
+  return created.key;
+}
 
 export interface Suggestion {
   ref: Ref;
@@ -34,7 +69,9 @@ async function reviewHistory(chain: ChangeChain, source: Assessed['source']): Pr
   if (source === 'demo') {
     const demo = await listByPrefix<ChangeChain>('demo:');
     const records = demo.flatMap(({ value }) =>
-      value.pullRequests.flatMap((pr) => pr.reviews.filter((r) => r.action === 'approved').map((r) => ({ reviewer: r.by, repo: pr.repo, pr: pr.id, at: r.at }))),
+      value.pullRequests.flatMap((pr) =>
+        pr.reviews.filter((r) => r.action === 'approved').map((r) => ({ reviewer: r.by, repo: pr.repo, pr: pr.id, at: r.at })),
+      ),
     );
     return { records, source: 'demo bank' };
   }
@@ -56,7 +93,8 @@ export async function whoMustApprove(key: string, prId?: string): Promise<WhoMus
     a.verdict.pullRequests[0];
   const conflicted = pr?.conflicted ?? [];
   const history = await reviewHistory(a.chain, a.source);
-  const kindOf = async (ref: Ref) => a.chain.people[ref]?.kind ?? (a.source === 'live' ? ((await getUser(ref))?.accountType === 'app' ? 'agent' : 'human') : undefined);
+  const kindOf = async (ref: Ref) =>
+    a.chain.people[ref]?.kind ?? (a.source === 'live' ? ((await getUser(ref))?.accountType === 'app' ? 'agent' : 'human') : undefined);
   const kinds: Record<Ref, string | undefined> = {};
   for (const r of new Set(history.records.map((h) => h.reviewer))) kinds[r] = await kindOf(r);
   const now = new Date().toISOString();
@@ -84,18 +122,24 @@ export async function whoMustApprove(key: string, prId?: string): Promise<WhoMus
 }
 
 /** Every chain with production deployments: the demo bank and live work items. */
-export async function populationChains(): Promise<ChangeChain[]> {
+export async function populationChains(check?: (key: string) => Promise<void>): Promise<ChangeChain[]> {
   const config = await getConfig();
   const demo = (await listByPrefix<ChangeChain>('demo:')).map((x) => x.value);
   const liveKeys = (await listByPrefix<unknown[]>('deploys:')).filter((x) => x.value.length).map((x) => x.key.slice('deploys:'.length));
   const demoKeys = new Set(demo.map((c) => c.workItem.key));
-  const live = await Promise.all(liveKeys.filter((k) => !demoKeys.has(k)).map((k) => liveChain(k, config)));
-  return [...demo, ...live];
+  const allowedDemo = check ? await visible(demo, (c) => c.workItem.key, check) : demo;
+  const keys = liveKeys.filter((k) => !demoKeys.has(k));
+  const allowedKeys = check ? await visible(keys, (k) => k, check) : keys;
+  const live: ChangeChain[] = [];
+  for (let n = 0; n < allowedKeys.length; n += 5) live.push(...(await Promise.all(allowedKeys.slice(n, n + 5).map((k) => liveChain(k, config)))));
+  return [...allowedDemo, ...live];
 }
 
-export async function populationTest(from: string, to: string): Promise<PopulationResult> {
+export async function populationTest(from: string, to: string, check?: (key: string) => Promise<void>): Promise<PopulationResult> {
+  if (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) || Date.parse(from) >= Date.parse(to))
+    throw new Error('Choose a valid reporting period.');
   const config = await getConfig();
-  return runPopulationTest(await populationChains(), from, to, config.policy);
+  return runPopulationTest(await populationChains(check), from, to, config.policy);
 }
 
 /** The default test period: the demo quarter when the demo bank is loaded, otherwise the last full quarter. */
@@ -116,8 +160,9 @@ export async function raiseExceptions(result: PopulationResult, projectKey: stri
   const raised = await getList<{ id: string; key: string }>('exceptions');
   const links: Record<string, string> = {};
   for (const e of result.exceptions) {
-    const id = `${e.deployment}|${e.workItem}|${result.evidenceSetHash.slice(0, 12)}`;
-    const existing = raised.find((r) => r.id === id);
+    const legacyId = `${e.deployment}|${e.workItem}|${result.evidenceSetHash.slice(0, 12)}`;
+    const id = `${projectKey}|${legacyId}`;
+    const existing = raised.find((r) => r.id === id || (r.id === legacyId && r.key.startsWith(`${projectKey}-`)));
     if (existing) {
       links[`${e.deployment}|${e.workItem}`] = `${base}/browse/${existing.key}`;
       continue;
@@ -128,15 +173,15 @@ export async function raiseExceptions(result: PopulationResult, projectKey: stri
       rule ? rule.statement : '',
       `Evidence hash ${e.evidenceHash}. Population test evidence set ${result.evidenceSetHash}.`,
     ].filter(Boolean);
-    const created = await createIssue({
+    const created = await createExceptionOnce(id, projectKey, {
       project: { key: projectKey },
       issuetype: type ? { id: type.id } : { name: 'Task' },
       summary: `Change independence exception: ${e.workItem} (${e.rule ?? e.verdict})`,
       labels: ['arms-length-exception'],
       description: { type: 'doc', version: 1, content: text.map((t) => ({ type: 'paragraph', content: [{ type: 'text', text: t }] })) },
     });
-    await appendUnique('exceptions', { id, key: created.key }, (a, b) => a.id === b.id);
-    links[`${e.deployment}|${e.workItem}`] = `${base}/browse/${created.key}`;
+    await appendUnique('exceptions', { id, key: created }, (a, b) => a.id === b.id);
+    links[`${e.deployment}|${e.workItem}`] = `${base}/browse/${created}`;
   }
   return links;
 }

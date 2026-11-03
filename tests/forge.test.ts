@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeKvs, fakeRequestJira, fakeRoute, memory, resetSite, site } from './fakes';
+import { fakeKvs, fakeRequestJira, fakeRequestAsUser, FakeFilter, fakeConditions, fakeRoute, memory, resetSite, site } from './fakes';
 
 vi.mock('@forge/kvs', () => ({
   kvs: fakeKvs,
   default: fakeKvs,
+  Filter: FakeFilter,
+  FilterConditions: fakeConditions,
   WhereConditions: { beginsWith: (prefix: string) => ({ prefix }) },
 }));
 vi.mock('@forge/api', () => {
   const asApp = () => ({ requestJira: (p: string, init?: RequestInit) => fakeRequestJira(p, init) });
   const asUser = () => ({
-    requestJira: (p: string, init?: RequestInit) => fakeRequestJira(p, init),
+    requestJira: (p: string, init?: RequestInit) => fakeRequestAsUser(p, init),
     requestTeamworkGraph: async () => ({ ok: false, status: 403, json: async () => ({ errors: [{ message: 'not allowlisted' }] }) }),
   });
   return { default: { asApp, asUser }, route: fakeRoute, webTrigger: { getUrl: async () => 'https://abc.hello.atlassian-dev.net/x1/trigger' } };
@@ -37,10 +39,21 @@ function seedSite() {
   site.issues['PAY-7'] = {
     id: '10007',
     key: 'PAY-7',
-    fields: { summary: 'Check the IBAN country code', created: '2026-10-27T17:30:00.000+0000', reporter: { accountId: LEA }, creator: { accountId: LEA }, assignee: { accountId: AGENT } },
+    fields: {
+      summary: 'Check the IBAN country code',
+      created: '2026-10-27T17:30:00.000+0000',
+      reporter: { accountId: LEA },
+      creator: { accountId: LEA },
+      assignee: { accountId: AGENT },
+    },
   };
   site.changelogs['PAY-7'] = [
-    { id: '1', author: { accountId: LEA }, created: '2026-10-27T17:40:00.000+0000', items: [{ field: 'assignee', fieldId: 'assignee', from: null, fromString: null, to: AGENT, toString: 'Coding agent' }] },
+    {
+      id: '1',
+      author: { accountId: LEA },
+      created: '2026-10-27T17:40:00.000+0000',
+      items: [{ field: 'assignee', fieldId: 'assignee', from: null, fromString: null, to: AGENT, toString: 'Coding agent' }],
+    },
   ];
   memory.secrets.set(K.secret, SECRET);
   memory.store.set(K.config, { identities: { [BOT]: { kind: 'service', actsAs: AGENT } } });
@@ -54,7 +67,11 @@ function bitbucketPr(approvers: string[], extraCommit = false) {
     author: { account_id: BOT, display_name: 'payments-bot', type: 'user' },
     created_on: '2026-10-27T18:05:00+00:00',
     source: { branch: { name: 'PAY-7-iban-country' }, commit: { hash: extraCommit ? 'bbb222222222' : 'aaa111111111' } },
-    participants: approvers.map((a) => ({ user: { account_id: a, display_name: site.users[a].displayName }, approved: true, participated_on: '2026-10-27T18:12:00+00:00' })),
+    participants: approvers.map((a) => ({
+      user: { account_id: a, display_name: site.users[a].displayName },
+      approved: true,
+      participated_on: '2026-10-27T18:12:00+00:00',
+    })),
   };
   const activity: BbActivity[] = [
     { update: { date: '2026-10-27T18:05:00+00:00', state: 'OPEN', source: { commit: { hash: 'aaa111111111' } } } },
@@ -65,7 +82,7 @@ function bitbucketPr(approvers: string[], extraCommit = false) {
     ...(extraCommit ? [{ hash: 'bbb2222222222222222222222222222222222222', date: '2026-10-27T18:29:00+00:00', author: { user: { account_id: BOT } } }] : []),
     { hash: 'aaa1111111111111111111111111111111111111', date: '2026-10-27T18:04:00+00:00', author: { user: { account_id: BOT } } },
   ];
-  return snapshotFromBitbucket({ repoSlug: 'payments-core', pr, activity, commits });
+  return { ...snapshotFromBitbucket({ repoSlug: 'payments-core', pr, activity, commits }), repositoryFullName: 'workspace/payments-core' };
 }
 
 const post = (body: unknown, opts: { secret?: string; at?: number } = {}) => {
@@ -145,12 +162,20 @@ describe('web trigger', () => {
 
   it('blocks the release of an unapproved commit and allows it after independent approval', async () => {
     await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: bitbucketPr([LEA]) });
-    const gate = { op: 'deploy-gate', repo: 'payments-core', commit: 'aaa1111111111111111111111111111111111111', environment: 'production', build: '41' };
+    const gate = {
+      op: 'deploy-gate',
+      repo: 'workspace/payments-core',
+      commit: 'aaa1111111111111111111111111111111111111',
+      environment: 'production',
+      build: '41',
+    };
     const blocked = JSON.parse((await post(gate)).body!);
     expect(blocked.allow).toBe(false);
     expect(memory.store.get(K.deployments('PAY-7'))).toBeUndefined();
 
-    await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: bitbucketPr([LEA, TOM]) });
+    const merged = bitbucketPr([LEA, TOM]);
+    Object.assign(merged.pullRequest, { state: 'MERGED', mergedAt: '2026-10-27T18:20:00Z' });
+    await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: merged });
     const allowed = JSON.parse((await post({ ...gate, build: '42' })).body!);
     expect(allowed.allow).toBe(true);
     expect((memory.store.get(K.deployments('PAY-7')) as unknown[]).length).toBe(1);
@@ -187,9 +212,16 @@ describe('workflow validator', () => {
 
 describe('MCP tools', () => {
   it('records the caller as principal, whatever the inputs say', async () => {
-    site.issues['PAY-8'] = { ...site.issues['PAY-7'], key: 'PAY-8', id: '10008', fields: { ...site.issues['PAY-7'].fields, reporter: { accountId: TOM }, assignee: null } };
+    site.issues['PAY-8'] = {
+      ...site.issues['PAY-7'],
+      key: 'PAY-8',
+      id: '10008',
+      fields: { ...site.issues['PAY-7'].fields, reporter: { accountId: TOM }, assignee: null },
+    };
     site.changelogs['PAY-8'] = [];
-    const out = (await declareAgentWorkAction({ workItem: 'pay-8', branch: 'PAY-8-x', principal: TOM, accountId: TOM } as never, { principal: { accountId: LEA } })) as {
+    const out = (await declareAgentWorkAction({ workItem: 'pay-8', branch: 'PAY-8-x', principal: TOM, accountId: TOM } as never, {
+      principal: { accountId: LEA },
+    })) as {
       recorded: { principalAccountId: string };
     };
     expect(out.recorded.principalAccountId).toBe(LEA);
@@ -203,27 +235,35 @@ describe('MCP tools', () => {
 
   it('names who must not approve and why', async () => {
     await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: bitbucketPr([LEA]) });
-    const out = (await whoMustApproveAction({ workItem: 'PAY-7' })) as { mustNotApprove: { name: string; why: string }[]; verdict: string };
+    const out = (await whoMustApproveAction({ workItem: 'PAY-7' }, { accountId: TOM })) as { mustNotApprove: { name: string; why: string }[]; verdict: string };
     expect(out.verdict).toBe('FAIL');
     expect(out.mustNotApprove).toEqual([{ ref: LEA, name: 'Léa Martin', why: 'requested the change and directed Coding agent' }]);
   });
 
   it('rejects malformed work item keys', async () => {
-    expect(await whoMustApproveAction({ workItem: 'DROP TABLE' })).toEqual({ error: 'Give a Jira work item key such as PAY-482.' });
+    expect(await whoMustApproveAction({ workItem: 'DROP TABLE' })).toEqual({ error: 'Give a valid Jira work item key.' });
   });
 });
 
 describe('management responses', () => {
   it('posts a response that only cites the evidence and rejects one that invents a person', async () => {
-    memory.store.set(K.reviews('payments-core'), [{ reviewer: TOM, repo: 'payments-core', pr: 'payments-core#9', at: new Date(Date.now() - 86_400_000).toISOString() }]);
+    memory.store.set(K.reviews('payments-core'), [
+      { reviewer: TOM, repo: 'payments-core', pr: 'payments-core#9', at: new Date(Date.now() - 86_400_000).toISOString() },
+    ]);
     await post({ op: 'pr-snapshot', workspace: '{ws}', snapshot: bitbucketPr([LEA]) });
-    const bad = (await managementResponseAction({ workItem: 'PAY-7', response: 'Jane Smith reviewed this change and approved it for release.' })) as { posted: boolean };
+    const bad = (await managementResponseAction(
+      { workItem: 'PAY-7', response: 'Jane Smith reviewed this change and approved it for release.' },
+      { accountId: TOM },
+    )) as { posted: boolean };
     expect(bad.posted).toBe(false);
     expect(site.comments['PAY-7']).toBeUndefined();
-    const good = (await managementResponseAction({
-      workItem: 'PAY-7',
-      response: 'Tom Becker will review payments-core#12 before release. Léa Martin directed the Coding agent, so her approval does not count under AL-1.',
-    })) as { posted: boolean };
+    const good = (await managementResponseAction(
+      {
+        workItem: 'PAY-7',
+        response: 'Tom Becker will review payments-core#12 before release. Léa Martin directed the Coding agent, so her approval does not count under AL-1.',
+      },
+      { accountId: TOM },
+    )) as { posted: boolean };
     expect(good.posted).toBe(true);
     expect(site.comments['PAY-7']).toHaveLength(1);
   });

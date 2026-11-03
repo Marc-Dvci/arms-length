@@ -33,6 +33,7 @@ async function pages<T>(first: string): Promise<{ values: T[]; complete: boolean
 
 /** Reads the pull request, its activity and its commits, and builds the snapshot. */
 export async function readPullRequest(workspace: string, repository: string, id: number | string) {
+  const observedAt = new Date().toISOString();
   const res = await api.asApp().requestBitbucket(route`/2.0/repositories/${workspace}/${repository}/pullrequests/${id}`);
   if (!res.ok) throw new Error(`Bitbucket returned ${res.status} for the pull request.`);
   const pr = (await res.json()) as BbPullRequest & { destination?: { repository?: { full_name?: string; name?: string } } };
@@ -41,8 +42,18 @@ export async function readPullRequest(workspace: string, repository: string, id:
     pages<BbCommit>(`/2.0/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repository)}/pullrequests/${id}/commits?pagelen=50`),
   ]);
   const slug = pr.destination?.repository?.full_name?.split('/').at(-1) ?? pr.destination?.repository?.name ?? repository;
+  const repositoryFullName = pr.destination?.repository?.full_name?.toLowerCase();
+  if (!repositoryFullName || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repositoryFullName))
+    throw new Error('Bitbucket did not supply a full repository identity.');
   const snapshot = snapshotFromBitbucket({ repoSlug: slug, pr, activity: activity.values, commits: commits.values });
-  return { ...snapshot, complete: snapshot.complete && activity.complete && commits.complete };
+  snapshot.pullRequest.id = `${repositoryFullName}#${id}`;
+  return {
+    ...snapshot,
+    repositoryFullName,
+    observedAt,
+    sourceUpdatedAt: pr.updated_on ?? pr.created_on,
+    complete: snapshot.complete && activity.complete && commits.complete,
+  };
 }
 
 /** Sends the snapshot to the paired Jira site and returns its verdict. Unpaired or unreachable fails closed. */
@@ -51,7 +62,11 @@ export async function checkPullRequest(workspace: string, repository: string, id
   const pairing = (await kvs.get<Pairing>('pairing')) as Pairing | undefined;
   const secret = (await kvs.getSecret<string>('pairing-secret')) as string | undefined;
   if (!pairing || !secret) {
-    return { verdict: 'CANNOT_DETERMINE', message: "Arm's Length is not paired with a Jira site yet. A workspace admin can pair it under Workspace settings > Arm's Length.", checkedAt };
+    return {
+      verdict: 'CANNOT_DETERMINE',
+      message: "Arm's Length is not paired with a Jira site yet. A workspace admin can pair it under Workspace settings > Arm's Length.",
+      checkedAt,
+    };
   }
   const snapshot = await readPullRequest(workspace, repository, id);
   const body = JSON.stringify({ op: 'pr-snapshot', workspace, snapshot });
@@ -65,7 +80,6 @@ export async function checkPullRequest(workspace: string, repository: string, id
   }
   const out = (await res.json()) as Omit<CheckResult, 'checkedAt'>;
   const result = { ...out, checkedAt };
-  await kvs.set(`verdict:${snapshot.pullRequest.id}`, result);
   await kvs.set(verdictKey(repository, id), result);
   return result;
 }

@@ -13,6 +13,13 @@ app:
     classifications:
       - pii
       - other
+    entities:
+      - name: record
+        attributes:
+          version:
+            type: integer
+          data:
+            type: any
 
 permissions:
   scopes:

@@ -3,8 +3,17 @@ import type { JiraChangelogEntry, JiraIssue, JiraUserRef } from '../adapters/jir
 
 export const PROPERTY_KEY = 'arms-length';
 
+export class JiraError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function json<T>(res: Response | Awaited<ReturnType<ReturnType<typeof api.asApp>['requestJira']>>, what: string): Promise<T> {
-  if (!res.ok) throw new Error(`${what} failed: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
+  if (!res.ok) throw new JiraError(`${what} failed: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300), res.status);
   return (res.status === 204 ? undefined : await res.json()) as T;
 }
 
@@ -55,7 +64,7 @@ export async function addComment(key: string, paragraphs: string[]): Promise<{ i
       content: paragraphs.map((text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })),
     },
   };
-  const res = await api.asApp().requestJira(route`/rest/api/3/issue/${key}/comment`, {
+  const res = await api.asUser().requestJira(route`/rest/api/3/issue/${key}/comment`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -63,8 +72,8 @@ export async function addComment(key: string, paragraphs: string[]): Promise<{ i
   return json(res, `Commenting on ${key}`);
 }
 
-export async function createIssue(fields: Record<string, unknown>): Promise<{ id: string; key: string }> {
-  const res = await api.asApp().requestJira(route`/rest/api/3/issue`, {
+export async function createIssue(fields: Record<string, unknown>, asUser = false): Promise<{ id: string; key: string }> {
+  const res = await (asUser ? api.asUser() : api.asApp()).requestJira(route`/rest/api/3/issue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields }),
@@ -101,13 +110,15 @@ export async function createIssues(items: Record<string, unknown>[]): Promise<st
   return keys;
 }
 
-export async function getProject(key: string): Promise<{ id: string; key: string; name: string; issueTypes?: { id: string; name: string; subtask?: boolean }[] }> {
+export async function getProject(
+  key: string,
+): Promise<{ id: string; key: string; name: string; issueTypes?: { id: string; name: string; subtask?: boolean }[] }> {
   const res = await api.asApp().requestJira(route`/rest/api/3/project/${key}`);
   return json(res, `Reading project ${key}`);
 }
 
 export async function listProjects(): Promise<{ id: string; key: string; name: string }[]> {
-  const res = await api.asApp().requestJira(route`/rest/api/3/project/search?maxResults=50&orderBy=name`);
+  const res = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=50&orderBy=name`);
   const body = await json<{ values: { id: string; key: string; name: string }[] }>(res, 'Listing projects');
   return body.values;
 }
@@ -122,14 +133,20 @@ export async function siteUrl(): Promise<string> {
 export async function postDevOps(path: 'devinfo' | 'deployments', body: unknown): Promise<unknown> {
   const res =
     path === 'devinfo'
-      ? await api.asApp().requestJira(route`/rest/devinfo/0.10/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      : await api.asApp().requestJira(route`/rest/deployments/0.1/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      ? await api
+          .asApp()
+          .requestJira(route`/rest/devinfo/0.10/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      : await api
+          .asApp()
+          .requestJira(route`/rest/deployments/0.1/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return json(res, `Sending ${path} data`);
 }
 
 /** Deletes one deployment from Jira's deployment information. */
 export async function deleteDeployment(pipelineId: string, environmentId: string, sequence: number): Promise<void> {
-  await api.asApp().requestJira(route`/rest/deployments/0.1/pipelines/${pipelineId}/environments/${environmentId}/deployments/${String(sequence)}`, { method: 'DELETE' });
+  await api
+    .asApp()
+    .requestJira(route`/rest/deployments/0.1/pipelines/${pipelineId}/environments/${environmentId}/deployments/${String(sequence)}`, { method: 'DELETE' });
 }
 
 export async function deleteDevOpsByProperty(property: string, value: string): Promise<void> {

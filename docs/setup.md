@@ -61,7 +61,7 @@ validator **Independent approval (Arm's Length)**, and publish.
 
 The transition then succeeds only for work items whose verdict is PASS. A refused transition shows the reason,
 for example "Arm's Length FAIL: payments-core#482 needs an approval from someone other than Léa Martin
-(requested the change and directed Coding agent).
+(requested the change and directed Coding agent)."
 
 ## 6. Pair Bitbucket
 
@@ -86,6 +86,12 @@ without blocking the merge; steps 5 and 7 block the release.
 
 The step exits 1, and the deployment stops, unless every work item the commit ships is PASS. Allowed production
 deployments are recorded and appear in the population test. Each attempt appears in the **Release gate** tab.
+
+The commit must be the full hash of the final head or merge commit of one complete, merged PR. The repository
+must be `workspace/repository`, supplied by `BITBUCKET_REPO_FULL_NAME` or the workspace and repository slug
+variables. Wait for the post-merge snapshot before running the gate; an early attempt fails closed and can be
+retried. Existing installations must upgrade both apps, grant the new Bitbucket workspace-read scope, and
+deploy the Jira `record` entity. See [the code audit changes](CHANGES-2026-11-03.md).
 
 ## 8. Connect a coding agent over MCP
 

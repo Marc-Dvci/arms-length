@@ -1,9 +1,11 @@
 import type { WebTriggerRequest, WebTriggerResponse } from '@forge/api';
 import { gateMessage } from '../core/explain';
+import { canonicalJson, sha256 } from '../core/evidence';
+import { evaluate } from '../core/evaluate';
 import { SIGNATURE_HEADER, verify } from '../core/signature';
 import type { PullRequest, Ref, VerdictValue } from '../core/types';
 import { assessIssue } from './chain';
-import { appendUnique, getConfig, getList, kvs, K, type StoredPullRequest } from './store';
+import { appendUnique, getConfig, readValue, updateValue, kvs, K, type StoredPullRequest } from './store';
 
 const reply = (statusCode: number, body: unknown): WebTriggerResponse => ({
   statusCode,
@@ -11,12 +13,22 @@ const reply = (statusCode: number, body: unknown): WebTriggerResponse => ({
   body: JSON.stringify(body),
 });
 
-export const commitKey = (hash: string) => K.commit(hash.slice(0, 12).toLowerCase());
+export const commitKey = (repo: string, hash: string) => K.commit(sha256(canonicalJson([repo.toLowerCase(), hash.toLowerCase()])));
+const fullHash = (hash: unknown): hash is string => typeof hash === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(hash);
+const fullRepository = (repo: unknown): repo is string => typeof repo === 'string' && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo);
 
 export interface SnapshotMessage {
   op: 'pr-snapshot';
   workspace: string;
-  snapshot: { pullRequest: PullRequest; people: Record<Ref, { name: string; type?: string }>; workItems: string[]; complete: boolean };
+  snapshot: {
+    pullRequest: PullRequest;
+    repositoryFullName?: string;
+    sourceUpdatedAt?: string;
+    observedAt?: string;
+    people: Record<Ref, { name: string; type?: string }>;
+    workItems: string[];
+    complete: boolean;
+  };
 }
 
 export interface GateMessage {
@@ -30,23 +42,81 @@ export interface GateMessage {
 
 export async function storeSnapshot(msg: SnapshotMessage): Promise<StoredPullRequest> {
   const { pullRequest, people, workItems, complete } = msg.snapshot;
-  const stored: StoredPullRequest = { ...pullRequest, workItems, workspace: msg.workspace, receivedAt: new Date().toISOString(), complete, people };
-  await kvs.set(K.pr(pullRequest.id), stored);
-  for (const key of workItems) await appendUnique<string>(K.prsOf(key), pullRequest.id, (a, b) => a === b);
-  for (const hash of [...pullRequest.commits.map((c) => c.hash), pullRequest.mergeCommit].filter((h): h is string => !!h)) {
-    await kvs.set(commitKey(hash), pullRequest.id);
-  }
-  const history = await getList<{ reviewer: Ref; repo: string; pr: string; at: string }>(K.reviews(pullRequest.repo));
-  const others = history.filter((h) => h.pr !== pullRequest.id);
-  const mine = pullRequest.reviews.filter((r) => r.action === 'approved').map((r) => ({ reviewer: r.by, repo: pullRequest.repo, pr: pullRequest.id, at: r.at }));
-  await kvs.set(K.reviews(pullRequest.repo), [...others, ...mine].slice(-500));
+  if (
+    !pullRequest ||
+    !Array.isArray(pullRequest.commits) ||
+    !Array.isArray(pullRequest.reviews) ||
+    !Array.isArray(workItems) ||
+    workItems.length > 20 ||
+    workItems.some((k) => !/^[A-Z][A-Z0-9_]*-\d+$/.test(k))
+  )
+    throw new Error('Invalid pull request snapshot.');
+  const now = new Date().toISOString();
+  const repositoryFullName = msg.snapshot.repositoryFullName?.toLowerCase();
+  if (repositoryFullName && !fullRepository(repositoryFullName)) throw new Error('Invalid repository identity.');
+  const id = repositoryFullName ? `${repositoryFullName}#${pullRequest.id.split('#').at(-1)}` : pullRequest.id;
+  const observedAt = msg.snapshot.observedAt ?? now;
+  const sourceUpdatedAt =
+    msg.snapshot.sourceUpdatedAt ??
+    [...pullRequest.commits.map((c) => c.at), ...pullRequest.reviews.map((r) => r.at), pullRequest.mergedAt, pullRequest.createdAt]
+      .filter((s): s is string => !!s)
+      .sort((a, b) => Date.parse(a) - Date.parse(b))
+      .at(-1)!;
+  if (![observedAt, sourceUpdatedAt].every((t) => Number.isFinite(Date.parse(t))) || Date.parse(observedAt) > Date.now() + 60000)
+    throw new Error('Invalid snapshot revision time.');
+  const incoming: StoredPullRequest = {
+    ...pullRequest,
+    id,
+    workItems: [...new Set(workItems)],
+    workspace: msg.workspace,
+    ...(repositoryFullName ? { repositoryFullName } : {}),
+    sourceUpdatedAt,
+    observedAt,
+    receivedAt: now,
+    complete,
+    people,
+  };
+  const stored = await updateValue<StoredPullRequest>(K.pr(id), (prior) => {
+    if (
+      prior &&
+      (Date.parse(prior.sourceUpdatedAt ?? prior.createdAt) > Date.parse(sourceUpdatedAt) ||
+        Date.parse(prior.observedAt ?? prior.receivedAt) > Date.parse(observedAt))
+    )
+      return prior;
+    // A pull request cannot return to OPEN after it has been merged or declined.
+    if (prior && prior.state !== 'OPEN' && incoming.state === 'OPEN') return prior;
+    if (prior && msg.snapshot.observedAt && prior.observedAt === observedAt && prior.sourceUpdatedAt === sourceUpdatedAt) {
+      const { receivedAt: _oldReceipt, ...oldEvidence } = prior;
+      const { receivedAt: _newReceipt, ...newEvidence } = incoming;
+      if (canonicalJson(oldEvidence) !== canonicalJson(newEvidence)) return { ...incoming, complete: false };
+    }
+    return incoming;
+  });
+  const legacyId = `${stored.repo}#${stored.id.split('#').at(-1)}`;
+  const legacy = stored.repositoryFullName && legacyId !== stored.id ? await readValue<StoredPullRequest>(K.pr(legacyId)) : undefined;
+  for (const key of stored.workItems)
+    await updateValue<string[]>(K.prsOf(key), (ids = []) => [
+      ...ids.filter((id) => id !== stored.id && !(legacy && legacy.workspace === stored.workspace && !legacy.repositoryFullName && id === legacyId)),
+      stored.id,
+    ]);
+  if (stored.repositoryFullName)
+    for (const hash of [...stored.commits.map((c) => c.hash), stored.mergeCommit].filter((h): h is string => fullHash(h))) {
+      await appendUnique<string>(commitKey(stored.repositoryFullName, hash), stored.id, (a, b) => a === b);
+    }
+  type History = { reviewer: Ref; repo: string; pr: string; at: string };
+  const mine = stored.reviews.filter((r) => r.action === 'approved').map((r) => ({ reviewer: r.by, repo: stored.repo, pr: stored.id, at: r.at }));
+  await updateValue<History[]>(K.reviews(stored.repo), (history = []) => [...history.filter((h) => h.pr !== stored.id), ...mine].slice(-500));
   return stored;
 }
 
 async function onSnapshot(msg: SnapshotMessage) {
   const stored = await storeSnapshot(msg);
   if (!stored.workItems.length) {
-    return { verdict: 'CANNOT_DETERMINE' as VerdictValue, message: "Arm's Length CANNOT DETERMINE: the branch name and title name no Jira work item.", workItems: [] };
+    return {
+      verdict: 'CANNOT_DETERMINE' as VerdictValue,
+      message: "Arm's Length CANNOT DETERMINE: the branch name and title name no Jira work item.",
+      workItems: [],
+    };
   }
   const results = [];
   for (const key of stored.workItems) {
@@ -64,28 +134,42 @@ async function onSnapshot(msg: SnapshotMessage) {
 
 async function onGate(msg: GateMessage) {
   const config = await getConfig();
-  const prId = (await kvs.get<string>(commitKey(msg.commit))) as string | undefined;
   const at = new Date().toISOString();
   const log = (entry: Record<string, unknown>) =>
-    getList<Record<string, unknown>>('gate-log').then((l) => kvs.set('gate-log', [...l, { at, ...msg, ...entry }].slice(-50)));
-  if (!prId) {
-    const message = `Arm's Length FAIL: commit ${msg.commit.slice(0, 12)} is not part of any pull request on record (AL-7).`;
+    updateValue<Record<string, unknown>[]>('gate-log', (rows = []) => [...rows, { at, ...msg, ...entry }].slice(-50));
+  const repo = typeof msg.repo === 'string' ? msg.repo.toLowerCase() : '';
+  const ids = fullRepository(repo) && fullHash(msg.commit) ? ((await readValue<string[]>(commitKey(repo, msg.commit))) ?? []) : [];
+  const candidates = await Promise.all(ids.map((id) => readValue<StoredPullRequest>(K.pr(id))));
+  const pr = candidates.filter(
+    (p): p is StoredPullRequest =>
+      !!p &&
+      p.repositoryFullName === repo &&
+      p.state === 'MERGED' &&
+      !!p.mergedAt &&
+      p.complete &&
+      (p.mergeCommit === msg.commit || p.commits.at(-1)?.hash === msg.commit),
+  );
+  if (pr.length !== 1) {
+    const message = `Arm's Length FAIL: the full commit and repository must identify one complete, merged pull request with that final or merge commit (AL-7).`;
     await log({ allow: false, message });
     return { allow: false, verdict: 'FAIL', message, workItems: [] };
   }
-  const pr = (await kvs.get<StoredPullRequest>(K.pr(prId))) as StoredPullRequest;
+  const source = pr[0];
   const production = config.policy.productionEnvironments.includes(msg.environment);
   const results = [];
-  for (const key of pr.workItems) {
+  for (const key of source.workItems) {
     const a = await assessIssue(key, { writeProperty: false });
-    results.push({ key, verdict: a.verdict.verdict, rule: a.verdict.rule, message: gateMessage(a.chain, a.verdict) });
+    const deployment = { id: `${repo}-${msg.build ?? at}`, env: msg.environment, at, commit: msg.commit, triggeredBy: msg.triggeredBy, pipeline: repo };
+    const projected = { ...a.chain, deployments: [...a.chain.deployments.filter((d) => d.id !== deployment.id), deployment] };
+    const verdict = evaluate(projected, config.policy);
+    results.push({ key, verdict: verdict.verdict, rule: verdict.rule, message: gateMessage(projected, verdict) });
   }
   const allow = results.length > 0 && results.every((r) => r.verdict === 'PASS');
   if (allow && production) {
-    for (const key of pr.workItems) {
+    for (const key of source.workItems) {
       await appendUnique(
         K.deployments(key),
-        { id: `${msg.repo}-${msg.build ?? at}`, env: msg.environment, at, commit: msg.commit, triggeredBy: msg.triggeredBy, pipeline: msg.repo },
+        { id: `${repo}-${msg.build ?? at}`, env: msg.environment, at, commit: msg.commit, triggeredBy: msg.triggeredBy, pipeline: repo },
         (a, b) => a.id === b.id,
       );
       await assessIssue(key);

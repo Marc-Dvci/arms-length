@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeKvs, fakeRequestConfluence, fakeRequestJira, fakeRoute, memory, resetSite, site } from './fakes';
+import { fakeKvs, fakeRequestConfluence, fakeRequestJira, fakeRequestAsUser, FakeFilter, fakeConditions, fakeRoute, memory, resetSite, site } from './fakes';
 
-vi.mock('@forge/kvs', () => ({ kvs: fakeKvs, default: fakeKvs, WhereConditions: { beginsWith: (prefix: string) => ({ prefix }) } }));
+vi.mock('@forge/kvs', () => ({
+  kvs: fakeKvs,
+  default: fakeKvs,
+  Filter: FakeFilter,
+  FilterConditions: fakeConditions,
+  WhereConditions: { beginsWith: (prefix: string) => ({ prefix }) },
+}));
 vi.mock('@forge/api', () => {
   const asApp = () => ({ requestJira: (p: string, init?: RequestInit) => fakeRequestJira(p, init) });
-  const asUser = () => ({ requestJira: asApp().requestJira, requestConfluence: (p: string, init?: RequestInit) => fakeRequestConfluence(p, init), requestTeamworkGraph: async () => ({ ok: false, status: 403, json: async () => ({}) }) });
+  const asUser = () => ({
+    requestJira: fakeRequestAsUser,
+    requestConfluence: (p: string, init?: RequestInit) => fakeRequestConfluence(p, init),
+    requestTeamworkGraph: async () => ({ ok: false, status: 403, json: async () => ({}) }),
+  });
   return { default: { asApp, asUser }, route: fakeRoute, webTrigger: { getUrl: async () => 'https://abc.hello.atlassian-dev.net/x1/t' } };
 });
 
@@ -16,7 +26,10 @@ import { handler } from '../src/forge/resolvers';
 
 /** Calls a resolver the way Forge does, with the signed-in user in the runtime payload. */
 const callResolver = (functionKey: string, payload: Record<string, unknown>, accountId: string) =>
-  (handler as (event: unknown, runtime: unknown) => Promise<{ demo: { canApprove: boolean; canShip: boolean } }>)({ call: { functionKey, payload }, context: {} }, { principal: { accountId } });
+  (handler as (event: unknown, runtime: unknown) => Promise<{ demo: { canApprove: boolean; canShip: boolean } }>)(
+    { call: { functionKey, payload }, context: {} },
+    { principal: { accountId } },
+  );
 
 const JUDGE = '5b10ac8d82e05b22cc7d4ef5';
 
@@ -75,7 +88,11 @@ describe('demo bank on a site', () => {
     expect(again.verdict.deployments).toHaveLength(0);
     expect(again.chain.pullRequests[0]).toMatchObject({ state: 'OPEN' });
     expect(again.chain.pullRequests[0].reviews.map((r) => again.chain.people[r.by].name)).toEqual(['Léa Martin']);
-    expect(site.devops.some((d) => (d as { p: string }).p.match(/^\/rest\/deployments\/0\.1\/pipelines\/payments-release\/environments\/production\/deployments\/\d+$/))).toBe(true);
+    expect(
+      site.devops.some((d) =>
+        (d as { p: string }).p.match(/^\/rest\/deployments\/0\.1\/pipelines\/payments-release\/environments\/production\/deployments\/\d+$/),
+      ),
+    ).toBe(true);
     expect((await demoShip(scene, JUDGE)).shipped).toBe(false);
   });
 

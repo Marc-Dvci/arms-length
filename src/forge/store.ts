@@ -1,5 +1,6 @@
-import { kvs, WhereConditions } from '@forge/kvs';
+import { kvs, WhereConditions, Filter, FilterConditions } from '@forge/kvs';
 import { DEFAULT_POLICY } from '../core/rules';
+import { sha256 } from '../core/evidence';
 import type { ChangeChain, Declaration, Deployment, Kind, Policy, PullRequest, Ref } from '../core/types';
 
 /** Key layout of the app's Forge storage. */
@@ -7,7 +8,7 @@ export const K = {
   config: 'config',
   secret: 'pairing-secret',
   declarations: (issue: string) => `decl:${issue}`,
-  pr: (id: string) => `pr:${id}`,
+  pr: (id: string) => `pr:${id.includes('/') ? sha256(id) : id}`,
   prsOf: (issue: string) => `prs:${issue}`,
   commit: (hash: string) => `commit:${hash}`,
   deployments: (issue: string) => `deploys:${issue}`,
@@ -42,6 +43,9 @@ export const DEFAULT_CONFIG: AppConfig = {
 export interface StoredPullRequest extends PullRequest {
   workItems: string[];
   workspace?: string;
+  repositoryFullName?: string;
+  sourceUpdatedAt?: string;
+  observedAt?: string;
   receivedAt: string;
   /** False when the repository history behind the snapshot was incomplete. */
   complete: boolean;
@@ -65,15 +69,44 @@ export async function getConfig(): Promise<AppConfig> {
 
 export const setConfig = (c: AppConfig) => kvs.set(K.config, c);
 
+export type Versioned<T> = { version: number; data: T };
+export async function readValue<T>(key: string): Promise<T | undefined> {
+  const current = await kvs.entity<Versioned<T>>('record').get(key);
+  return current ? current.data : await kvs.get<T>(key);
+}
+/** Migrate legacy values on write; update the discoverable projection in the same transaction. */
+export async function updateValue<T>(key: string, change: (value: T | undefined) => T): Promise<T> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const prior = await kvs.entity<Versioned<T>>('record').get(key);
+    const current = prior ? prior.data : await kvs.get<T>(key);
+    const data = change(current);
+    if (data === current) return data;
+    const next = { version: (prior?.version ?? 0) + 1, data };
+    if (new TextEncoder().encode(JSON.stringify(next)).length > 220000)
+      throw new Error('The evidence record is too large. Export it and narrow the managed scope.');
+    try {
+      await kvs
+        .transact()
+        .set(key, next, {
+          entityName: 'record',
+          conditions: new Filter<Versioned<T>>().and('version', prior ? FilterConditions.equalTo(prior.version) : FilterConditions.notExists()),
+        })
+        .set(key, data)
+        .execute();
+      return data;
+    } catch (error) {
+      if (attempt === 7) throw error;
+    }
+  }
+  throw new Error('The evidence changed too often. Retry the operation.');
+}
+
 export async function getList<T>(key: string): Promise<T[]> {
-  return ((await kvs.get<T[]>(key)) as T[] | undefined) ?? [];
+  return (await readValue<T[]>(key)) ?? [];
 }
 
 export async function appendUnique<T>(key: string, item: T, same: (a: T, b: T) => boolean): Promise<T[]> {
-  const list = await getList<T>(key);
-  const next = [...list.filter((x) => !same(x, item)), item];
-  await kvs.set(key, next);
-  return next;
+  return updateValue<T[]>(key, (list = []) => [...list.filter((x) => !same(x, item)), item]);
 }
 
 export const getDeclarations = (issue: string) => getList<Declaration>(K.declarations(issue));
@@ -81,8 +114,8 @@ export const getDeployments = (issue: string) => getList<Deployment>(K.deploymen
 
 export async function getPullRequests(issue: string): Promise<StoredPullRequest[]> {
   const ids = await getList<string>(K.prsOf(issue));
-  const prs = await Promise.all(ids.map((id) => kvs.get<StoredPullRequest>(K.pr(id))));
-  return prs.filter((p): p is StoredPullRequest => !!p);
+  const prs = await Promise.all(ids.map((id) => readValue<StoredPullRequest>(K.pr(id))));
+  return prs.filter((p): p is StoredPullRequest => !!p && p.workItems.includes(issue));
 }
 
 export const getDemoChain = async (issue: string) => ((await kvs.get<ChangeChain>(K.demoChain(issue))) as ChangeChain | undefined) ?? null;

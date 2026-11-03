@@ -6,9 +6,11 @@
   "private": true,
   "author": "Marc Donovici",
   "engines": {
-    "node": ">=22"
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
   },
   "scripts": {
+    "pretest": "node scripts/check-shell.mjs",
+    "audit": "npm run typecheck && npm test && npm run eval && npm run manifest && npm run demo",
     "test": "vitest run",
     "eval": "tsx eval/run.ts",
     "demo": "tsx cli/demo.ts",
@@ -23,7 +25,7 @@
     "@types/react": "^18.3.31",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "5.0.5"
   },
   "dependencies": {
     "@forge/api": "^8.4.0",
@@ -32,5 +34,10 @@
     "@forge/react": "^12.4.0",
     "@forge/resolver": "^2.0.2",
     "react": "^18.3.1"
+  },
+  "overrides": {
+    "prosemirror-view": "^1.42.3",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }
