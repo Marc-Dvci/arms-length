@@ -27,7 +27,7 @@ Confluence is optional. Without it, everything works except **Publish workpaper*
 **Settings (gear) > Marketplace apps**, then **Arm's Length** under **Apps** in the left navigation (also
 reachable from **Open the settings** on the empty population page). Tab **Get started**: choose a project and
 click **Load demo bank**. It creates 35 work items labelled
-`arms-length-demo`, stores their synthetic change chains, and sends their pull requests and deployments to
+`arms-length-demo`, stores their change chains, and sends their pull requests and deployments to
 Jira's development panel. **Reset the scene** puts the open pull request back as it was loaded, so the scene
 can be played again after **Approve as me** and **Merge and deploy**. **Remove demo data** deletes the chains and
 the development data; the work items stay.
@@ -90,8 +90,7 @@ deployments are recorded and appear in the population test. Each attempt appears
 The commit must be the full hash of the final head or merge commit of one complete, merged PR. The repository
 must be `workspace/repository`, supplied by `BITBUCKET_REPO_FULL_NAME` or the workspace and repository slug
 variables. Wait for the post-merge snapshot before running the gate; an early attempt fails closed and can be
-retried. Existing installations must upgrade both apps, grant the new Bitbucket workspace-read scope, and
-deploy the Jira `record` entity. See [the code audit changes](CHANGES-2026-11-03.md).
+retried.
 
 ## 8. Connect a coding agent over MCP
 

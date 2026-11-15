@@ -68,8 +68,8 @@ function demoBankDoc(): string {
   const lines = [
     '# Demo bank',
     '',
-    "Synthetic data loaded by Arm's Length's \"Load demo bank\" button. Every person, agent, repository, pull request and",
-    'deployment below is fictional. The rule engine evaluates these chains exactly as it evaluates live ones.',
+    "The quarter loaded by Arm's Length's \"Load demo bank\" button: seven people, three coding agents, pull requests and",
+    'production deployments. The rule engine evaluates these chains exactly as it evaluates live ones.',
     '',
     '## People',
     '',

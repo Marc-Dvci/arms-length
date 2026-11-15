@@ -161,7 +161,7 @@ function App() {
               ) : (
                 <Stack space="space.100">
                   <Text>
-                    Creates 35 work items in the project you choose, with one quarter of synthetic change chains: people, three coding agents, pull requests and production deployments, including six known violations.
+                    Creates 35 work items in the project you choose, with one quarter of change chains: people, three coding agents, pull requests and production deployments, including six known violations.
                   </Text>
                   <Inline space="space.200" alignBlock="end" shouldWrap>
                     <Field id="demo-project" label="Project">

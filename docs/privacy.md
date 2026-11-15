@@ -22,7 +22,7 @@ server, database or analytics service, and receives none of your data.
   commit hashes, timestamps, and the work items linked to each pull request.
 - Production deployments allowed by the Pipelines gate, and the release gate log.
 - The verdict of each work item, as a Jira issue property, so it can be searched with JQL.
-- The demo bank, when you load it: synthetic people and change chains.
+- The demo bank, when you load it: its people and change chains.
 
 ## What the apps write to your site
 

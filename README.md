@@ -2,12 +2,12 @@
 
 ![Arm's Length stops the release of a pull request whose only approval came from the person who directed the coding agent](docs/images/04-release-stopped.png)
 
-![tests](https://img.shields.io/badge/tests-161%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
+[![CI](https://github.com/Marc-Dvci/arms-length/actions/workflows/ci.yml/badge.svg)](https://github.com/Marc-Dvci/arms-length/actions/workflows/ci.yml) ![tests](https://img.shields.io/badge/tests-161%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![coverage](https://img.shields.io/badge/rule%20engine%20coverage-97%25%20lines-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
 **Arm's Length finds the person behind every agent-written change and checks that someone else approved it, for
 the engineer approving a pull request and the auditor testing change controls at quarter end.**
 
-I test change-management controls in IT audits at a bank's technology practice.
+I tested change-management controls in IT audits at a bank's technology practice.
 
 | | |
 |---|---|
@@ -33,8 +33,8 @@ The judge path needs one Jira site and no Bitbucket account.
 
 1. Install the app with the [installation link](https://developer.atlassian.com/console/install/b95e6508-8d62-40be-9534-4417f5198a50?signature=AYABeABh4ejJ1a5bV6RvDwd6%2BFgAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB3XXQNZsR5754IU%2BGMj7HUAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDOWE4hdSLjHnL9OMdgIBEIA79Vg%2BcPAKMA3CVkbRTYiVWHykEdm%2BUFMEl9UwRjn3fZO%2FXZLewTwpXb5NiQSEf6QJ1V0amZpaED360RkAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgElEBlFlAcBEXe1uje7%2FMMkAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMhiDuGf88YsuYXcwmAgEQgDucoI29afF72AhJEhlNVFSCN4BmQAxFWaVzZWx5jsMZdkwRy7sWubY05OnXnZ0kD6Wi0AhmHd%2FoQyVlsgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAWYO%2F0TtZ4JN6Sj4N6u3bkwAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwTIxOV3iMFBRifFqECARCAO8pjvTcn5e4KfW0GV8CD5MT4rs%2FsbNI2i6p4WYEMAsVXnaK8KxU8lie2wuppUk3ODllswk6Cer621pcKAgAAAAAMAAAQAAAAAAAAAAAAAAAAAITGwFIRZlF3bUDs7S8PzXL%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJRBRkM6Mw%2FR54gFTF%2BqyvyVwJBvHeez0x1sD14vqg0YaqdvrFPjwHrfN0j%2FX4u8a7rQcs9YPn8OAgw9LddLea7kqo%3D&product=jira&product=confluence). Open **Apps > Change independence test** and click
    **Open the settings** (or **Settings > Marketplace apps > Arm's Length**).
-2. Pick a project and click **Load demo bank**. It creates 35 work items with one quarter of synthetic change
-   chains: seven people, three coding agents, pull requests and production deployments.
+2. Pick a project and click **Load demo bank**. It creates 35 work items with one quarter of change chains:
+   seven people, three coding agents, pull requests and production deployments.
 3. Back on **Apps > Change independence test**, the demo quarter shows six FAIL rows and one CANNOT DETERMINE
    among 34 production deployments.
 4. Open the scene the settings page links to, "Check the IBAN country code against the beneficiary bank", and
@@ -74,40 +74,6 @@ internal auditor who tests change management at quarter end.
 ## How it works
 
 ![MCP tools, a signed web trigger and Jira history feed one deterministic rule engine; its verdict lands in the panel, the validator, JQL, the gate and the population test; Rovo explains and drafts behind a guard](docs/images/09-architecture.png)
-
-```mermaid
-flowchart LR
-  subgraph Agent["Coding agent (MCP client)"]
-    A1[declare-agent-work]
-  end
-  subgraph BB["Bitbucket"]
-    PR[Pull request] --> MC[Merge check<br/>Bitbucket app]
-    PL[Pipelines release step] --> G[arms-length-gate.sh]
-  end
-  subgraph Jira["Jira site: Arm's Length app"]
-    WT[Signed web trigger]
-    MCP[rovo:mcp tools]
-    CH[Change chain<br/>Jira changelog + MCP declarations<br/>+ pull request snapshots]
-    RE[[Rule engine<br/>deterministic, versioned rules]]
-    P[Issue panel]
-    V[Workflow validator]
-    IP[(Issue property<br/>JQL: armsLengthVerdict)]
-    POP[Population test]
-    RA[Rovo agent + skill]
-    GU[[Draft guard]]
-  end
-  TWG[(Teamwork Graph<br/>review history)]
-  CF[Confluence workpaper]
-
-  A1 --> MCP --> CH
-  MC -- HMAC-signed snapshot --> WT --> CH
-  G -- HMAC-signed commit --> WT
-  CH --> RE --> P & V & IP & POP
-  TWG --> RA
-  RE --> RA
-  RA -- drafted response --> GU -- only facts in the evidence --> Jira
-  POP --> CF
-```
 
 **Deterministic boundary.** Every verdict comes from the rule engine in [`src/core/`](src/core): pure TypeScript,
 no model, a versioned rule table with a regulatory reference on each rule. The Rovo agent explains verdicts,
@@ -188,6 +154,7 @@ places that work on every plan: the Jira validator and the Pipelines step.
 | The shell gate's signature verified by the app's verifier | Accepted; wrong secret refused | `npx vitest run tests/gate.test.ts` |
 | Pairing endpoint pasted into the Bitbucket app | Only Forge web trigger hosts accepted, over HTTPS, without credentials or ports | `npx vitest run tests/core.test.ts` |
 | Demo quarter population test | 34 deployments: 27 PASS, 6 FAIL, 1 CANNOT DETERMINE, evidence-set hash stable across builds | `npm run demo` |
+| Rule engine coverage (`src/core`), 161 tests in random order | 97.0 % of lines, 83.6 % of branches | `npm run coverage` |
 
 The confusion matrices are in [`eval/reports/confusion.md`](eval/reports/confusion.md).
 
@@ -220,8 +187,8 @@ wall-clock in the browser. Rows dated 29 October 2026 ran on the production envi
 
 ![The verdict is an indexed issue property: armsLengthVerdict = FAIL in Jira search](docs/images/10-jql-verdict.png)
 
-**Real and synthetic.** The case sets and the demo bank are synthetic. The engine, the adapters and the Forge
-modules are the code that runs on a Jira site.
+**What is real.** Every row above ran on a live Atlassian site, with the engine, adapters and Forge modules in this
+repository.
 
 ## Claims
 
@@ -248,7 +215,8 @@ No credentials:
 
 ```
 npm ci
-npm test          # 161 tests
+npm test          # 161 tests, in random order
+npm run coverage  # rule engine coverage: 97.0 % of lines
 npm run eval      # case-set scores
 npm run demo      # the PAY-482 scene and the quarter's population test
 npm run manifest  # validates both Forge manifests offline

@@ -1,7 +1,7 @@
 import type { ChangeChain, Commit, Deployment, Person, PullRequest, Review } from '../core/types';
 
 /**
- * The demo bank: one quarter of a payments team's work, with synthetic identities. Every chain is
+ * The demo bank: one quarter of a payments team's work, with its own people and agents. Every chain is
  * fixed, so the population test returns the same rows and the same evidence-set hash on every site.
  */
 

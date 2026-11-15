@@ -12,6 +12,7 @@
     "pretest": "node scripts/check-shell.mjs",
     "audit": "npm run typecheck && npm test && npm run eval && npm run manifest && npm run demo",
     "test": "vitest run",
+    "coverage": "vitest run --coverage --reporter=default --reporter=json --outputFile.json=coverage/tests.json",
     "eval": "tsx eval/run.ts",
     "demo": "tsx cli/demo.ts",
     "typecheck": "tsc --noEmit",
@@ -23,6 +24,7 @@
     "@forge/manifest": "^13.8.0",
     "@types/node": "^24.19.2",
     "@types/react": "^18.3.31",
+    "@vitest/coverage-v8": "5.0.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "5.0.5"

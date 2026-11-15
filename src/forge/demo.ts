@@ -104,8 +104,8 @@ export async function loadDemoBank(projectKey: string, caller: Ref): Promise<Dem
         type: 'doc',
         version: 1,
         content: [
-          { type: 'paragraph', content: [{ type: 'text', text: `Demo bank work item ${c.workItem.key}. Its change chain (people, agents, pull requests, deployments) is synthetic and stored by Arm's Length.` }] },
-          { type: 'paragraph', content: [{ type: 'text', text: `Synthetic team: ${roles}.` }] },
+          { type: 'paragraph', content: [{ type: 'text', text: `Demo bank work item ${c.workItem.key}. Its change chain (people, agents, pull requests, deployments) is stored by Arm's Length.` }] },
+          { type: 'paragraph', content: [{ type: 'text', text: `Demo team: ${roles}.` }] },
         ],
       },
     })),

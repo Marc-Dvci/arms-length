@@ -53,7 +53,7 @@ CANNOT DETERMINE blocks a release like FAIL: missing evidence is not approval.
 - `ignoredApprovals[].reason`: `conflicted` (the approver is in the chain), `stale` (an earlier commit),
   `after_merge` (approved after the merge without a valid emergency), `non_human` (a bot or agent).
 - `flags` may contain `RETRO_APPROVAL`: an emergency change approved after the merge, inside the window.
-- `source: demo` means the work item belongs to the demo bank, whose people are synthetic.
+- `source: demo` means the work item belongs to the demo bank loaded from the settings.
 
 ## Errors
 
