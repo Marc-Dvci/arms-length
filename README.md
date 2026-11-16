@@ -1,6 +1,8 @@
 # Arm's Length: independent approval for agent-written code
 
-![Arm's Length stops the release of a pull request whose only approval came from the person who directed the coding agent](docs/images/04-release-stopped.png)
+[![Watch the 2:25 film: Arm's Length on a live Jira site](docs/images/film-thumbnail.jpg)](https://youtu.be/kyG88uf6TCU)
+
+**[Watch the film on YouTube (2:25)](https://youtu.be/kyG88uf6TCU)**
 
 [![CI](https://github.com/Marc-Dvci/arms-length/actions/workflows/ci.yml/badge.svg)](https://github.com/Marc-Dvci/arms-length/actions/workflows/ci.yml) ![tests](https://img.shields.io/badge/tests-161%20passing-1f883d) ![case%20set](https://img.shields.io/badge/labelled%20chains-42%2F42-1f883d) ![held--out](https://img.shields.io/badge/held--out%20chains-16%2F16-1f883d) ![coverage](https://img.shields.io/badge/rule%20engine%20coverage-97%25%20lines-1f883d) ![licence](https://img.shields.io/badge/licence-MIT-blue) ![Forge](https://img.shields.io/badge/Atlassian-Forge-0052CC)
 
@@ -21,13 +23,15 @@ I tested change-management controls in IT audits at a bank's technology practice
 
 | Criterion | Where to look |
 |---|---|
-| Technological implementation | [`manifest.yml`](manifest.yml) and [`bitbucket/manifest.yml`](bitbucket/manifest.yml) (modules across Jira, Bitbucket, Rovo and MCP, plus the Confluence and Teamwork Graph APIs), [`src/forge/`](src/forge), [`tests/forge.test.ts`](tests/forge.test.ts) |
-| Design | [The issue panel](src/frontend/panel.tsx), [the population test](src/frontend/population.tsx), [the settings](src/frontend/admin.tsx), [the judge path](#see-it-work) |
-| Potential impact | [The problem](#the-problem), [the rule table](src/core/rules.ts) with its regulatory references |
+| Technological implementation | [`manifest.yml`](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/manifest.yml) and [`bitbucket/manifest.yml`](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/bitbucket/manifest.yml) (modules across Jira, Bitbucket, Rovo and MCP, plus the Confluence and Teamwork Graph APIs), [`src/forge/`](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/src/forge), [`tests/forge.test.ts`](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/tests/forge.test.ts) |
+| Design | [The issue panel](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/src/frontend/panel.tsx), [the population test](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/src/frontend/population.tsx), [the settings](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/src/frontend/admin.tsx), [the judge path](#see-it-work) |
+| Potential impact | [The problem](#the-problem), [the rule table](https://github.com/Marc-Dvci/arms-length/blob/v1.0.0/src/core/rules.ts) with its regulatory references |
 | Innovation | [The MCP caller's identity is the evidence](#the-mcp-call-is-the-evidence) |
 | Presentation | [How it works](#how-it-works), [Evidence](#evidence) |
 
 ## See it work
+
+![Arm's Length stops the release of a pull request whose only approval came from the person who directed the coding agent](docs/images/04-release-stopped.png)
 
 The judge path needs one Jira site and no Bitbucket account.
 
